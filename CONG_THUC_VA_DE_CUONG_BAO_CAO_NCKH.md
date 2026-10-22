@@ -192,16 +192,40 @@ $$
 
 Trong phép xấp xỉ sử dụng trong lõi mã nguồn, hạng đưa đầu vào vào trạng thái có dạng $\bar{\mathbf{B}}_t\approx\Delta_t\mathbf{B}_t$. Do đó, cả bước thời gian, ma trận vào và ma trận đọc trạng thái đều có thể thay đổi theo từng phiên.
 
-Nhờ đó, mô hình có thể điều chỉnh cách lưu giữ hoặc quên thông tin theo trạng thái thị trường tại từng phiên. Mã nguồn đề tài dùng lõi Mamba gốc, kết hợp chiếu đặc trưng đầu vào, tích chập một chiều theo thời gian, hàm kích hoạt SiLU, cơ chế cổng và kết nối phần dư; đầu ra cuối cửa sổ được đưa qua lớp hồi quy tuyến tính.
+Nhờ đó, mô hình có thể điều chỉnh cách lưu giữ hoặc quên thông tin theo trạng thái thị trường tại từng phiên. Mã nguồn đề tài **tự triển khai** một Selective SSM tối giản từ các phương trình trên, gồm chiếu đặc trưng đầu vào, tích chập một chiều nhân quả, hàm SiLU, cơ chế cổng, chuẩn hóa RMS và kết nối phần dư; đầu ra tại thời điểm cuối cửa sổ đi qua lớp hồi quy tuyến tính. Kho mã không sao chép hoặc vendoring mã nguồn MambaStock.
 
 Về mặt thực nghiệm, Mamba được thiết kế để xử lý chuỗi với độ phức tạp tăng tuyến tính theo chiều dài chuỗi thông qua selective scan [Gu & Dao, 2023].
 
-## 8. Huấn luyện mô hình
+### 7.3. Quét trạng thái trong hiện thực đề tài
 
-Hàm mất mát được tối thiểu hóa là sai số bình phương trung bình:
+Với mỗi thành phần trạng thái, mã sử dụng truy hồi rời rạc:
 
 $$
-\mathcal{L}_{MSE}=\frac{1}{N}\sum_{i=1}^{N}(y_i-\hat y_i)^2.
+h_t=a_t\odot h_{t-1}+b_t,\qquad h_{-1}=0,
+$$
+
+trong đó $a_t=\exp(\Delta_t A)$ và $b_t$ là hạng đưa input có phụ thuộc $\Delta_t$, $B_t$ và input đã qua causal convolution. Hai phép biến đổi affine liên tiếp được ghép theo:
+
+$$
+(a_2,b_2)\circ(a_1,b_1)=(a_2\odot a_1,\ b_2+a_2\odot b_1).
+$$
+
+Phép ghép này có tính kết hợp. Do đó, chương trình dùng prefix scan theo cây để nhận toàn bộ $h_t$ với $\lceil\log_2 W\rceil$ bước tensor thay vì vòng lặp Python theo từng phiên. Đây là tối ưu hiện thực; test đơn vị xác nhận kết quả bằng truy hồi tuần tự.
+
+## 8. Huấn luyện mô hình
+
+Hàm mất mát được tối thiểu hóa là sai số bình phương trung bình trên nhãn đã chuẩn hóa theo train:
+
+$$
+\tilde y=\frac{y-\mu_{train}}{\sigma_{train}},
+\qquad
+\mathcal{L}_{MSE}=\frac{1}{N}\sum_{i=1}^{N}(\tilde y_i-\widehat{\tilde y}_i)^2.
+$$
+
+Trong đó $\mu_{train}$ và $\sigma_{train}$ chỉ được tính từ $y_{train}$. Khi đánh giá, dự báo được đảo chuẩn hóa:
+
+$$
+\hat y=\widehat{\tilde y}\sigma_{train}+\mu_{train}.
 $$
 
 Các cấu hình thực nghiệm đang sử dụng:
@@ -209,18 +233,18 @@ Các cấu hình thực nghiệm đang sử dụng:
 | Thành phần | Cấu hình |
 |---|---|
 | Độ dài cửa sổ | 30 phiên |
-| Số lớp mạng | 2 |
-| Kích thước trạng thái ẩn | 16 |
+| Số lớp mạng | 1 |
+| Kích thước trạng thái ẩn | 8 |
 | Optimizer | Adam |
 | Learning rate | 0,001 |
 | Batch size | 128 |
-| Số epoch tối đa | 75 |
-| Early stopping | patience = 12, theo MSE xác thực |
-| Hạt giống ngẫu nhiên | 42 |
+| Số epoch tối đa | 40 |
+| Early stopping | patience = 8, theo MSE xác thực |
+| Hạt giống ngẫu nhiên | 42, 52, 62, 72, 82 |
 
-Các tham số mặc định của lõi Mamba đang dùng là $d_{state}=16$, hệ số mở rộng $E=2$, tích chập thời gian một chiều có kernel $d_{conv}=4$ và selective scan song song. Với hidden size $D=16$, mô hình có kích thước biểu diễn bên trong là $E\times D=32$.
+Các tham số mặc định của Selective SSM là $d_{state}=8$, hệ số mở rộng $E=1$, tích chập thời gian nhân quả có kernel $d_{conv}=3$. Với hidden size $D=8$, mô hình có kích thước biểu diễn bên trong $E\times D=8$. LSTM có 585 tham số, Selective SSM cơ sở có 545 tham số và bản thêm VN-Index có 553 tham số; các quy mô này gần nhau để so sánh công bằng trên bộ dữ liệu nhỏ.
 
-Early stopping giữ lại checkpoint có MSE xác thực tốt nhất và dừng khi không cải thiện sau 12 epoch liên tiếp. Điều này giúp giảm nguy cơ quá khớp.
+Early stopping giữ lại checkpoint có MSE xác thực tốt nhất và dừng khi không cải thiện sau 8 epoch liên tiếp. Hai baseline `naive_zero` và `train_mean` được thêm vào để tránh việc so sánh mạng chỉ với nhau.
 
 ## 9. Thước đo đánh giá
 
@@ -267,27 +291,20 @@ Trong đó $\mathbb{I}[\cdot]$ là hàm chỉ báo. DA cho biết tỷ lệ mô 
 **Đầu vào:** Dữ liệu OHLCV từng mã ngân hàng, VN-Index, độ dài cửa sổ $W=30$.  
 **Đầu ra:** $\hat y_t$, các chỉ số RMSE, MAE, $R^2$, DA trên tập kiểm tra.
 
-1. Sắp xếp dữ liệu theo ngày tăng dần và loại các quan sát thiếu cần thiết.
-2. Tính $r_t$, $v_t$, $q_t$ và $r_t^{(VN)}$.
-3. Dịch $r_t$ lùi một phiên để tạo nhãn $y_t=r_{t+1}$.
-4. Chia mẫu theo thời gian thành train, validation và test.
-5. Fit StandardScaler chỉ bằng dữ liệu đầu vào train; biến đổi validation/test bằng cùng scaler.
-6. Dùng cửa sổ trượt để tạo $(\mathbf{X}_t,y_t)$, với 30 phiên quá khứ dự báo một phiên kế tiếp.
-7. Huấn luyện lần lượt LSTM, Mamba cơ sở và Improved Mamba bằng MSE/Adam; dùng validation để early stopping.
-8. Khôi phục checkpoint tốt nhất, dự báo trên test và tính RMSE, MAE, $R^2$, DA.
-9. Tổng hợp kết quả theo từng mã và theo từng nhóm mô hình.
+1. Sắp xếp dữ liệu theo ngày tăng dần; kiểm tra schema, giá trị thiếu, điều kiện OHLCV và lưu SHA-256 của từng tệp.
+2. Tính $r_t$, $v_t$, $q_t$ và $r_t^{(VN)}$; tạo nhãn $y_t=r_{t+1}$ cùng ngày nhãn `target_date`.
+3. Fit StandardScaler chỉ bằng feature có trong train; tạo cửa sổ $(\mathbf{X}_t,y_t)$ dài 30 phiên và chia mẫu theo `target_date` thành train, validation, test.
+4. Chuẩn hóa nhãn bằng $\mu_{train},\sigma_{train}$; không fit lại trên validation hoặc test.
+5. Với mỗi mã, tạo dự báo `naive_zero` và `train_mean`; huấn luyện LSTM, Selective SSM cơ sở, Selective SSM có VN-Index trên năm seed.
+6. Dùng MSE/Adam, validation để early stopping; khôi phục checkpoint tốt nhất và đảo chuẩn hóa output.
+7. Dự báo trên test và tính RMSE, MAE, $R^2$, DA; kiểm định chênh lệch squared loss có phương sai HAC so với baseline zero.
+8. Tổng hợp mean và độ lệch chuẩn qua seed, sau đó qua các mã; lưu manifest môi trường và báo cáo tự động.
 
 ## 11. Kết quả hiện có và cách diễn giải
 
-Trung bình trên 8 mã ngân hàng ở tập kiểm tra:
+Không chép tay metric vào tài liệu này. Sau khi chạy đủ 136 cấu hình, `generate_report.py` sinh trực tiếp các bảng và phần diễn giải từ `results/metrics.csv`. Vì vậy, số liệu trong báo cáo luôn có thể truy vết về seed, ticker, feature set, commit mã và SHA-256 dữ liệu.
 
-| Mô hình | RMSE | MAE | $R^2$ | DA |
-|---|---:|---:|---:|---:|
-| LSTM | 0,026417 | 0,020189 | -1,078250 | 0,448747 |
-| Mamba cơ sở | 0,053051 | 0,044755 | -7,573619 | **0,470387** |
-| Improved Mamba | **0,024680** | **0,018623** | **-0,732823** | 0,446469 |
-
-Kết luận phù hợp với số liệu là: **Improved Mamba tốt nhất theo các thước đo sai số hồi quy RMSE, MAE và $R^2$**; Mamba cơ sở có DA cao nhất nhưng sai số độ lớn lớn hơn nhiều. Không nên kết luận mô hình dự báo tốt về mặt thực tiễn khi $R^2$ trung bình vẫn âm; điều này phản ánh dự báo return ngắn hạn là bài toán nhiễu cao và là điểm cần thảo luận trung thực trong báo cáo.
+Khi viết phần kết quả, dùng `BANG_TONG_HOP_NHOM_VI.csv` để báo cáo trung bình và độ lệch chuẩn. Mô hình có RMSE/MAE thấp nhất chỉ là lựa chọn tốt nhất **trong snapshot và thiết lập đã kiểm tra**. Không chọn mô hình chỉ theo DA; nếu $R^2$ âm, phải nêu rõ rằng mô hình kém hơn dự báo hằng bằng trung bình test theo chỉ số đó. `KIEM_DINH_HAC_VI.csv` là bằng chứng bổ sung về squared loss, không phải lý do duy nhất để kết luận.
 
 Các bảng và biểu đồ đã sinh có thể chèn vào Chương Kết quả:
 
@@ -302,13 +319,13 @@ Các bảng và biểu đồ đã sinh có thể chèn vào Chương Kết quả
 Nếu trường chưa có mẫu bắt buộc, có thể dùng cấu trúc sau. Nhiều hướng dẫn trình bày báo cáo khoa học dùng mạch: tóm tắt, từ khóa, giới thiệu, phương pháp, kết quả và thảo luận, kết luận, tài liệu tham khảo; yêu cầu riêng của trường luôn được ưu tiên hơn đề cương này.
 
 1. **Trang bìa, trang phụ bìa, lời cam đoan, lời cảm ơn, mục lục, danh mục bảng và hình.**
-2. **Tóm tắt** (khoảng 200–300 từ): vấn đề, dữ liệu, ba mô hình, kết quả chính và đóng góp. Thêm từ khóa: *dự báo tỷ suất sinh lợi; cổ phiếu ngân hàng; Mamba; LSTM; VN-Index*.
+2. **Tóm tắt** (khoảng 200–300 từ): vấn đề, dữ liệu, hai baseline và ba mô hình mạng, kết quả chính và đóng góp. Thêm từ khóa: *dự báo tỷ suất sinh lợi; cổ phiếu ngân hàng; Selective SSM; LSTM; VN-Index*.
 3. **Chương 1 — Mở đầu**
    - Lý do chọn đề tài và tính cấp thiết.
    - Mục tiêu tổng quát, mục tiêu cụ thể.
    - Câu hỏi nghiên cứu: Mamba có giảm sai số dự báo return ngày kế tiếp so với LSTM không? Việc thêm return VN-Index có cải thiện kết quả không?
    - Đối tượng, phạm vi: 8 mã ngân hàng; dữ liệu 2020–2026; dự báo 1 phiên kế tiếp.
-   - Đóng góp: pipeline tránh rò rỉ dữ liệu, so sánh ba mô hình, kết quả thực nghiệm trên ngân hàng Việt Nam.
+   - Đóng góp: pipeline tránh rò rỉ dữ liệu, hai baseline, lặp năm seed và kết quả thực nghiệm trên ngân hàng Việt Nam.
 4. **Chương 2 — Tổng quan nghiên cứu và cơ sở lý thuyết**
    - Tổng quan dự báo chuỗi thời gian tài chính.
    - LSTM và các nghiên cứu liên quan.
@@ -324,7 +341,7 @@ Nếu trường chưa có mẫu bắt buộc, có thể dùng cấu trúc sau. N
    - Thống kê mô tả dữ liệu.
    - Bảng kết quả tổng hợp và bảng theo từng mã.
    - Biểu đồ actual–predicted/loss; phân tích trường hợp Mamba tốt hoặc chưa tốt.
-   - So sánh công bằng giữa ba mô hình; thảo luận $R^2$ âm, nhiễu thị trường, giới hạn chưa dùng tin tức/sentiment.
+   - So sánh công bằng giữa các baseline và mô hình mạng; thảo luận $R^2$ âm, nhiễu thị trường, giới hạn chưa dùng tin tức/sentiment.
 7. **Kết luận và kiến nghị**
    - Trả lời từng mục tiêu/câu hỏi nghiên cứu bằng số liệu.
    - Nêu giới hạn; đề xuất mở rộng Bài toán 2 (volatility) hoặc Bài toán 3 (risk classification) ở nghiên cứu sau.
@@ -348,5 +365,5 @@ Các mục dưới đây là tài liệu nền tảng; khi nộp chính thức c
 - Chỉ mô tả những gì đã chạy: không ghi sentiment, volatility forecast hay phân loại rủi ro như một thành phần đã có.
 - Phân biệt rõ **return của cổ phiếu** $r_t$ với **return VN-Index** $r_t^{(VN)}$.
 - Báo cáo cả chỉ số tốt lẫn hạn chế. Không che $R^2$ âm hoặc chỉ chọn DA để kết luận.
-- Khi so sánh, dùng cùng dữ liệu, cùng cách chia thời gian, cùng cửa sổ 30 phiên và cùng thước đo cho cả ba mô hình.
+- Khi so sánh, dùng cùng dữ liệu, cùng cách chia thời gian, cùng cửa sổ 30 phiên và cùng thước đo cho mọi mô hình.
 - Nếu trường cung cấp mẫu bìa, định dạng trang hoặc mẫu biểu riêng, mẫu đó có ưu tiên cao hơn đề cương này.

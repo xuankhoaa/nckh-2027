@@ -11,9 +11,8 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from config import BASE_FEATURES, VNINDEX_FEATURE, TimeSplit
+from data_quality import REQUIRED_OHLCV, validate_ohlcv
 
-
-REQUIRED_OHLCV = ("time", "open", "high", "low", "close", "volume")
 
 
 @dataclass
@@ -42,7 +41,9 @@ def _read_ohlcv(path: Path) -> pd.DataFrame:
         frame[column] = pd.to_numeric(frame[column], errors="raise")
     if frame["time"].duplicated().any():
         raise ValueError(f"{path.name} has duplicate dates.")
-    return frame.sort_values("time").reset_index(drop=True)
+    frame = frame.sort_values("time").reset_index(drop=True)
+    validate_ohlcv(frame, path.stem)
+    return frame
 
 
 def build_feature_frame(ticker: str, data_dir: Path | str = "data") -> pd.DataFrame:

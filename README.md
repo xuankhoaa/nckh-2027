@@ -1,173 +1,146 @@
-# NCKH 2027 — Dự báo tỷ suất sinh lợi cổ phiếu ngân hàng Việt Nam bằng Mamba
+# NCKH 2027 — Dự báo tỷ suất sinh lợi cổ phiếu ngân hàng Việt Nam bằng Selective SSM
 
-## 1. Giới thiệu
+## Mục tiêu và phạm vi
 
-Đây là mã nguồn phục vụ đề tài nghiên cứu khoa học về dự báo **tỷ suất sinh lợi logarit của phiên giao dịch kế tiếp** cho nhóm cổ phiếu ngân hàng Việt Nam. Đề tài so sánh mô hình LSTM với hai cấu hình Mamba trên cùng một quy trình dữ liệu theo thời gian, có kiểm soát rò rỉ dữ liệu tương lai.
+Kho mã này phục vụ **Bài toán 1 — dự báo tỷ suất sinh lợi cổ phiếu**: từ thông tin có đến cuối phiên giao dịch $t$, dự báo **log-return** của phiên $t+1$ cho tám cổ phiếu ngân hàng Việt Nam. Đây là bài toán hồi quy, không phải dự báo giá đóng cửa và không phải khuyến nghị đầu tư.
 
-**Câu hỏi nghiên cứu chính:** Với thông tin thị trường có đến cuối phiên $t$, mô hình nào dự báo tốt hơn tỷ suất sinh lợi logarit của phiên $t+1$? Việc bổ sung tỷ suất sinh lợi của VN-Index có giúp Mamba giảm sai số hay không?
+$$
+y_t = r_{t+1}=\ln\left(\frac{P_{t+1}}{P_t}\right).
+$$
 
-> Đây là **bài toán hồi quy dự báo tỷ suất sinh lợi**. Kho mã hiện chưa xây dựng bài toán dự báo độ biến động tương lai, phân loại rủi ro thấp/trung bình/cao, hoặc đặc trưng sentiment từ tin tức.
+Phạm vi hiện tại chỉ giải quyết Bài toán 1. Kho mã chưa tạo target độ biến động tương lai (Bài toán 2) và chưa gán nhãn rủi ro thấp/trung bình/cao để làm phân lớp (Bài toán 3). Hai hướng đó được nêu như mở rộng, không được trình bày như kết quả đã đạt được.
 
-Tài liệu công thức, thuật toán và đề cương báo cáo NCKH: [CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md](CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md).
+Tài liệu nền tảng:
 
-Hướng dẫn thao tác từ đầu vào đến đầu ra: [HUONG_DAN_A_Z.md](HUONG_DAN_A_Z.md).
+- [Công thức, thuật toán và đề cương NCKH](CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md)
+- [Hướng dẫn vận hành A–Z](HUONG_DAN_A_Z.md)
+- [Ghi chú nguồn tham khảo](THIRD_PARTY_NOTICES.md)
 
-## 2. Phạm vi dữ liệu và đầu vào
+## Dữ liệu đầu vào
 
-| Nội dung | Mô tả |
+| Thành phần | Nội dung |
 |---|---|
-| Nhóm cổ phiếu | VCB, BID, CTG, MBB, TCB, ACB, VPB và STB |
-| Chỉ số thị trường | VN-Index |
-| Dữ liệu gốc | Giá mở cửa, cao nhất, thấp nhất, đóng cửa và khối lượng giao dịch hằng ngày (OHLCV) |
-| Khoảng dữ liệu đã chạy | 02/01/2020–12/10/2026; ACB có 1.684 phiên, các mã còn lại và VN-Index có 1.689 phiên |
-| Đơn vị dự báo | Một phiên giao dịch kế tiếp |
-| Độ dài cửa sổ đầu vào | 30 phiên giao dịch |
+| Mã cổ phiếu | `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB` |
+| Chỉ số thị trường | `VNINDEX` |
+| Nguồn | OHLCV ngày từ Vnstock/KBS, lưu cache CSV cục bộ |
+| Snapshot thiết kế | 01/01/2020–12/10/2026; ngày thực tế của từng tệp được ghi trong manifest |
+| Cửa sổ đầu vào | 30 phiên giao dịch |
+| Đầu ra mỗi mẫu | Một log-return liên tục của phiên kế tiếp |
 
-Dữ liệu được lấy bằng Vnstock, lưu cục bộ trong `data/` sau khi tải. Thư mục này không được đưa lên GitHub vì có thể tải lại bằng mã nguồn; các lần chạy sử dụng dữ liệu đã lưu sẽ không gọi lại nguồn dữ liệu nếu không có tùy chọn `--force`.
+Mỗi CSV phải có sáu cột: `time`, `open`, `high`, `low`, `close`, `volume`. `data_quality.py` kiểm tra cột bắt buộc, trùng ngày, giá trị thiếu/không hữu hạn, điều kiện OHLC dương, `high >= low`, khối lượng không âm và phạm vi `close`. Mã SHA-256, số dòng, ngày đầu/cuối và cảnh báo được lưu vào `data/DATA_MANIFEST.json` khi chạy pipeline. Dữ liệu gốc không bị tự sửa.
 
-## 3. Bài toán và cách tạo dữ liệu
+## Đặc trưng, nhãn và chống rò rỉ dữ liệu
 
-Gọi $P_t$ là giá đóng cửa tại phiên $t$. Tỷ suất sinh lợi logarit của cổ phiếu được tính như sau:
+Từ mỗi phiên $t$, chương trình tạo:
 
-```text
-return_t = ln(P_t / P_(t-1))
+| Đặc trưng | Công thức |
+|---|---|
+| `return` | $\ln(P_t/P_{t-1})$ |
+| `volume_change` | $V_t/V_{t-1}-1$ |
+| `high_low_range` | $(H_t-L_t)/P_t$ |
+| `vnindex_return` | $\ln(I_t/I_{t-1})$ |
+
+LSTM và Selective SSM cơ sở dùng tám biến: OHLCV cùng ba đặc trưng dẫn xuất đầu. Selective SSM có VN-Index dùng thêm `vnindex_return`, nên có chín biến. Mỗi mẫu có dạng $X_t=[x_{t-29},\ldots,x_t]$ và nhãn $y_t=r_{t+1}$.
+
+Mẫu được gán theo **ngày của nhãn**, không chia ngẫu nhiên:
+
+| Tập | Ngày của nhãn | Vai trò |
+|---|---|---|
+| Train | Đến 31/12/2023 | Fit scaler, target scaler và trọng số |
+| Validation | 01/01/2024–31/12/2024 | Chọn epoch dừng sớm |
+| Test | Từ 01/01/2025 | Chỉ đánh giá cuối cùng |
+
+`StandardScaler` chỉ fit trên feature của train. Với mạng nơ-ron, target cũng được chuẩn hóa bằng trung bình và độ lệch chuẩn **của train** để tối ưu ổn định, rồi đảo chuẩn hóa trước khi tính metric. Cửa sổ test được phép chứa lịch sử trước đó nhưng không thể chứa feature hoặc nhãn sau ngày cần dự báo.
+
+## Mô hình được đánh giá
+
+| ID | Mô hình | Vai trò |
+|---|---|---|
+| `naive_zero` | Luôn dự báo return bằng 0 | Baseline “không thay đổi” |
+| `train_mean` | Luôn dự báo trung bình return của train | Baseline hằng, chỉ dùng train |
+| `lstm` | LSTM một lớp, hidden size 8, 585 tham số (8 đầu vào) | Đối chứng tuần tự |
+| `mamba_baseline` | Selective SSM một lớp, $d_{state}=8$, causal convolution kernel 3, 545 tham số | Đánh giá SSM với OHLCV dẫn xuất |
+| `improved_mamba` | Selective SSM như trên, thêm return VN-Index, 553 tham số | Kiểm tra đóng góp thị trường chung |
+
+`models/mamba_model.py` là hiện thực Selective SSM tự viết từ mô tả trong bài báo Mamba. Nó dùng RMSNorm, chiếu đầu vào, causal depthwise convolution, tham số chọn lọc $\Delta,B,C$, kết nối residual và cổng SiLU. Phép quét trạng thái dùng phép ghép affine kết hợp theo cây; test đơn vị xác nhận nó tương đương truy hồi tuần tự. Kho không chứa mã nguồn vendored từ MambaStock.
+
+## Thiết kế thực nghiệm và đánh giá
+
+Mỗi mạng được lặp lại trên năm seed: `42, 52, 62, 72, 82`. Mỗi lần chạy dùng Adam (`learning_rate=0.001`), tối đa 40 epoch, batch size 128, early stopping với patience 8 theo MSE validation. Hai baseline là xác định nên chỉ cần seed 0.
+
+Lệnh chạy đầy đủ tạo đúng **136 lần chạy**:
+
+$$
+8\ \text{mã}\times\left(2\ \text{baseline}+3\ \text{mạng}\times5\ \text{seed}\right)=136.
+$$
+
+Các metric trên test gồm RMSE, MAE, $R^2$ và Directional Accuracy (DA). Báo cáo còn có kiểm định chênh lệch squared loss với phương sai HAC khi so sánh mỗi seed mạng với baseline zero return. Không chọn mô hình chỉ theo DA; RMSE/MAE đo độ lớn sai số. $R^2$ âm phải được báo cáo trung thực, vì nó cho thấy mô hình kém hơn dự báo hằng bằng trung bình tập test theo thước đo đó.
+
+## Cài đặt và chạy lại
+
+`get_data.py` dùng API `Quote` thuộc dòng **Vnstock 4.x**, vì vậy `requirements.txt` khóa `vnstock<5`. Không cài Vnstock 5.x chồng lên cùng môi trường. Để tải dữ liệu mới, hãy tạo môi trường riêng và thiết lập khóa API của bạn trong `.env`; tuyệt đối không đưa khóa vào Git.
+
+```powershell
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-Nhãn cần dự báo của mỗi mẫu là tỷ suất sinh lợi ở phiên kế tiếp:
+Sau khi điền `VNSTOCK_API_KEY` vào `.env`, luồng tái lập là:
 
-```text
-target_return_t = return_(t+1) = ln(P_(t+1) / P_t)
+```powershell
+.\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
+.\.venv\Scripts\python.exe run_experiments.py
+.\.venv\Scripts\python.exe generate_report.py --window 30
+.\.venv\Scripts\python.exe verify_project.py --require-results
 ```
 
-Từ một cửa sổ 30 phiên kết thúc tại $t$, mô hình dự báo `target_return_t`. Nói cách khác, đầu vào chỉ chứa thông tin đã biết đến cuối phiên $t$; không chứa giá, khối lượng hay return của phiên $t+1$.
+Mặc định `get_data.py` tái sử dụng CSV đã cache. Chỉ thêm `--force` khi chủ ý ghi đè snapshot dữ liệu. `run_experiments.py` tự xóa đúng các output tái tạo được trước một lượt chạy mới; dùng `--keep-results` chỉ khi hiểu rõ mình đang tiếp tục tập kết quả cùng schema.
 
-Các đặc trưng dẫn xuất được tính bằng:
+## Đầu ra
 
-| Đặc trưng | Công thức | Ý nghĩa |
-|---|---|---|
-| `return` | `ln(close_t / close_(t-1))` | Tỷ suất sinh lợi logarit của cổ phiếu |
-| `volume_change` | `volume_t / volume_(t-1) - 1` | Thay đổi tương đối của thanh khoản |
-| `high_low_range` | `(high_t - low_t) / close_t` | Biên độ dao động nội phiên đã chuẩn hóa |
-| `vnindex_return` | `ln(VNIndex_t / VNIndex_(t-1))` | Tỷ suất sinh lợi logarit của thị trường chung |
+Tất cả kết quả sinh tự động ở `results/` (được Git bỏ qua vì tái tạo được):
 
-`vnindex_return` là return của VN-Index, không phải return của cổ phiếu đang dự báo. Sau khi ghép dữ liệu cổ phiếu với VN-Index theo ngày giao dịch, chỉ các ngày có dữ liệu ở cả hai bên mới được sử dụng.
-
-## 4. Các mô hình được so sánh
-
-| Mô hình | Đầu vào | Vai trò trong thực nghiệm |
-|---|---|---|
-| LSTM | OHLCV và ba đặc trưng dẫn xuất `return`, `volume_change`, `high_low_range` | Mô hình đối chứng phổ biến cho chuỗi thời gian |
-| Mamba cơ sở | Cùng tập đặc trưng với LSTM | Đánh giá lõi Mamba khi chưa có thông tin chỉ số thị trường |
-| Improved Mamba | Tập đặc trưng của Mamba cơ sở cộng `vnindex_return` | Kiểm tra tác động của thông tin thị trường chung |
-
-Mô hình Mamba tái sử dụng lõi Selective State Space Model từ [MambaStock](https://github.com/zshicode/MambaStock) trong `external/MambaStock/`. Lớp `models/mamba_model.py` bổ sung chiếu đầu vào và đầu ra hồi quy một giá trị tại trạng thái cuối của cửa sổ. Cấu hình thực nghiệm: 2 lớp, hidden size 16, trạng thái SSM 16, hệ số mở rộng 2 và tích chập thời gian một chiều có kernel 4.
-
-## 5. Kiểm soát rò rỉ dữ liệu và thiết kế đánh giá
-
-Chuỗi tài chính không được chia ngẫu nhiên. Mỗi mẫu được gán vào tập dữ liệu theo **ngày của nhãn cần dự báo**, không phải theo ngày bắt đầu cửa sổ.
-
-| Tập | Khoảng thời gian của ngày nhãn |
+| Tệp | Nội dung |
 |---|---|
-| Huấn luyện | Đến hết 31/12/2023 |
-| Xác thực | 01/01/2024–31/12/2024 |
-| Kiểm tra | Từ 01/01/2025 đến 12/10/2026 |
+| `EXPERIMENT_MANIFEST.json` | Commit, phiên bản môi trường, thiết bị, cấu hình và manifest dữ liệu |
+| `BANG_KET_QUA_CHI_TIET_VI.csv` | 136 metric theo mã, mô hình và seed; tiêu đề tiếng Việt |
+| `BANG_TONG_HOP_NHOM_VI.csv` | Trung bình và độ lệch chuẩn giữa mã/seed |
+| `DU_BAO_THEO_NGAY_VI.csv` | Log-return thực tế và dự báo từng ngày test; tiêu đề tiếng Việt |
+| `KIEM_DINH_HAC_VI.csv` | Kiểm định chênh lệch squared loss so với zero return |
+| `BAO_CAO_KET_QUA.md` | Báo cáo tóm tắt sinh tự động từ chính các CSV |
+| `bieu_do/` | Learning curve, thực tế–dự báo và biểu đồ metric nhóm |
 
-Quy trình có năm biện pháp chống rò rỉ dữ liệu:
+`generate_report.py` cũng tạo [bản báo cáo Markdown đầy đủ](bao_cao/BAO_CAO_NCKH.md) để làm nguồn cho người phụ trách soạn Word. Báo cáo không thay Word; nó là nội dung có thể kiểm tra bằng mã và kết quả hiện hành.
 
-1. `target_return` và `target_date` được dịch sang phiên kế tiếp.
-2. Mỗi chuỗi chỉ dùng 30 phiên kết thúc ở $t$ để dự báo $t+1$.
-3. Dữ liệu được chia theo thứ tự thời gian; không dùng random split.
-4. `StandardScaler` chỉ được fit bằng các quan sát đầu vào thuộc giai đoạn huấn luyện. Tập xác thực và kiểm tra chỉ dùng lại các tham số chuẩn hóa của tập huấn luyện.
-5. Epoch tốt nhất được chọn theo MSE trên tập xác thực. Tập kiểm tra chỉ được dùng để đánh giá cuối cùng của một lần chạy.
+## Cấu trúc mã nguồn
 
-## 6. Thiết lập huấn luyện và thước đo
-
-Lần chạy toàn bộ nhóm dùng hạt giống ngẫu nhiên 42, Adam với `learning_rate = 0.001`, batch size 128, tối đa 75 epoch và early stopping sau 12 epoch không cải thiện MSE trên tập xác thực. Mô hình sẽ dùng GPU nếu PyTorch nhận diện được; nếu không, mô hình chạy trên CPU.
-
-Các thước đo được báo cáo trên tập kiểm tra:
-
-| Thước đo | Cách hiểu |
+| Tệp | Vai trò |
 |---|---|
-| RMSE | Căn bậc hai của trung bình bình phương sai số; càng thấp càng tốt |
-| MAE | Trung bình sai số tuyệt đối; càng thấp càng tốt |
-| R² | Mức độ giải thích biến thiên; càng lớn càng tốt. R² âm nghĩa là mô hình kém hơn dự báo hằng bằng trung bình tập kiểm tra trong cấu hình đó |
-| Độ chính xác hướng (DA) | Tỷ lệ dự báo đúng dấu tăng/giảm của return; cần đọc cùng RMSE và MAE vì không phản ánh độ lớn sai số |
+| `config.py` | Snapshot dữ liệu, ticker, split, window và seed |
+| `get_data.py` | Tải/cache OHLCV và tạo manifest dữ liệu |
+| `data_quality.py` | Xác thực OHLCV và SHA-256 dữ liệu |
+| `preprocess.py` | Feature, target, scaler và cửa sổ không rò rỉ |
+| `baselines.py` | Hai baseline hằng |
+| `models/lstm.py` | LSTM đối chứng |
+| `models/mamba_model.py` | Selective SSM tự triển khai |
+| `train.py` | Huấn luyện một cấu hình và lưu dự báo/metric |
+| `run_experiments.py` | Chạy đầy đủ 136 cấu hình |
+| `evaluate.py` | Metric, CSV và biểu đồ |
+| `generate_report.py` | Báo cáo/bảng tiếng Việt từ kết quả |
+| `verify_project.py` | Xác minh mã, dữ liệu cache và output |
+| `tests/` | Test chất lượng dữ liệu, leakage, scan và metric |
 
-## 7. Kết quả của lần chạy đầy đủ hiện tại
+## Giới hạn và hướng mở rộng
 
-Kết quả dưới đây là trung bình trên 8 mã cổ phiếu, với cửa sổ 30 phiên. Đây là kết quả đánh giá lịch sử đến 12/10/2026, không phải dự báo chắc chắn cho tương lai.
+- Đây là dự báo one-day-ahead return với feature giá/khối lượng và VN-Index; chưa dùng tin tức, sentiment, yếu tố vĩ mô hoặc báo cáo tài chính.
+- Chưa có transaction cost, chiến lược giao dịch hay backtest lợi nhuận. Không dùng output làm khuyến nghị mua/bán.
+- Để giải quyết Bài toán 2, cần định nghĩa target độ biến động tương lai (ví dụ tổng bình phương return trong $h$ phiên tới) và đánh giá RMSE/MAE riêng.
+- Để giải quyết Bài toán 3, cần quy tắc gán nhãn rủi ro từ target tương lai, xử lý mất cân bằng lớp và dùng metric classification như macro-F1, balanced accuracy, confusion matrix.
+- Bước nghiên cứu tiếp theo hợp lý là walk-forward validation và kiểm tra độ bền qua window 60/90, được lập kế hoạch trước thay vì chọn theo test.
 
-| Mô hình | RMSE trung bình | MAE trung bình | R² trung bình | DA trung bình |
-|---|---:|---:|---:|---:|
-| LSTM | 0,026417 | 0,020189 | -1,078250 | 0,448747 |
-| Mamba cơ sở | 0,053051 | 0,044755 | -7,573619 | **0,470387** |
-| Improved Mamba | **0,024680** | **0,018623** | **-0,732823** | 0,446469 |
-
-**Diễn giải đúng theo số liệu:** Improved Mamba có sai số RMSE và MAE thấp nhất, đồng thời có R² trung bình cao nhất trong ba mô hình. Mamba cơ sở có DA cao nhất nhưng sai số độ lớn lại cao hơn đáng kể. Vì vậy không thể kết luận một mô hình tốt hơn hoàn toàn ở mọi tiêu chí. R² trung bình của cả ba mô hình đều âm; đây là hạn chế quan trọng, cho thấy dự báo return một phiên là bài toán có nhiễu cao và chưa đạt hiệu quả tốt hơn dự báo trung bình trên tập kiểm tra.
-
-Bảng theo từng mã, dự báo theo ngày và biểu đồ được tạo tại `results/` sau khi chạy. Thư mục `results/` được Git bỏ qua vì là đầu ra tái tạo được.
-
-## 8. Cấu trúc mã nguồn
-
-| Tệp/thư mục | Chức năng |
-|---|---|
-| `config.py` | Danh sách 8 mã, tập đặc trưng và mốc chia thời gian |
-| `get_data.py` | Tải, kiểm tra và lưu dữ liệu OHLCV theo ngày |
-| `preprocess.py` | Tạo đặc trưng, nhãn, chuẩn hóa và cửa sổ trượt không rò rỉ dữ liệu |
-| `models/lstm.py` | Mô hình LSTM đối chứng |
-| `models/mamba_model.py` | Mô hình hồi quy dùng lõi Mamba |
-| `external/MambaStock/` | Mã lõi Mamba và selective scan được sử dụng lại, có ghi nguồn |
-| `train.py` | Huấn luyện một cấu hình, early stopping và lưu đánh giá |
-| `run_experiments.py` | Chạy 3 mô hình cho toàn bộ 8 mã |
-| `evaluate.py` | Tính metric, lưu bảng dự báo và vẽ biểu đồ |
-| `generate_report.py` | Sinh bảng/báo cáo kết quả tiếng Việt từ đầu ra đã lưu |
-| `CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md` | Công thức toán, thuật toán và đề cương viết báo cáo |
-| `HUONG_DAN_A_Z.md` | Hướng dẫn sử dụng từ đầu vào đến đầu ra |
-
-## 9. Cài đặt và chạy lại thí nghiệm
-
-Mã thu thập dữ liệu hiện sử dụng API `Quote` của **Vnstock 4.x**. Môi trường kiểm chứng là Vnstock 4.0.8; không dùng Vnstock 5.x cho phiên bản mã này.
-
-1. Chuẩn bị Python 3.10 trở lên và môi trường ảo phù hợp.
-2. Tạo tệp `.env` từ `.env.example`, sau đó đặt khóa Vnstock của bạn vào biến `VNSTOCK_API_KEY`. Không đưa khóa vào mã nguồn hoặc GitHub.
-3. Cài thư viện:
-
-   ```powershell
-   python -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
-   ```
-
-4. Tải dữ liệu cho toàn bộ nhóm ngân hàng và VN-Index:
-
-   ```powershell
-   python get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
-   ```
-
-5. Chạy ba mô hình và sinh báo cáo tiếng Việt:
-
-   ```powershell
-   python run_experiments.py --window 30 --epochs 75 --batch-size 128
-   python generate_report.py --window 30
-   ```
-
-Tệp đầu ra quan trọng:
-
-- `results/BAO_CAO_KET_QUA.md`: báo cáo kết quả tổng hợp bằng tiếng Việt.
-- `results/BANG_KET_QUA_CHI_TIET_VI.csv`: kết quả đầy đủ theo mã và mô hình.
-- `results/BANG_TONG_HOP_NHOM_VI.csv`: trung bình và độ lệch chuẩn theo mô hình.
-- `results/DU_BAO_THEO_NGAY_VI.csv`: return thực tế và return dự báo theo ngày kiểm tra.
-- `results/bieu_do/`: biểu đồ loss, dự báo–thực tế và so sánh các metric.
-
-Chỉ dùng `--force` khi thực sự muốn tải lại/ghi đè dữ liệu đã lưu trong `data/`.
-
-## 10. Giới hạn và hướng mở rộng
-
-- Đề tài chỉ dùng dữ liệu giá, khối lượng và return VN-Index; chưa sử dụng báo cáo tài chính, biến kinh tế vĩ mô hay sentiment từ tin tức.
-- Kết quả mới là một thiết lập dữ liệu và siêu tham số; chưa có kiểm định thống kê hoặc tối ưu siêu tham số toàn diện.
-- R² âm cho thấy không nên dùng trực tiếp kết quả như khuyến nghị mua/bán hay tư vấn đầu tư.
-- Hướng mở rộng phù hợp là: tạo target độ biến động tương lai cho Bài toán 2; xây nhãn rủi ro thấp/trung bình/cao và đánh giá classification cho Bài toán 3; hoặc bổ sung sentiment và kiểm định qua nhiều cửa sổ thời gian.
-
-## 11. Tài liệu tham khảo nền tảng
+## Tài liệu tham khảo
 
 1. Gu, A., & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752. https://arxiv.org/abs/2312.00752
 2. Shi, Z. (2024). *MambaStock: Selective State Space Model for Stock Prediction*. arXiv:2402.18959. https://arxiv.org/abs/2402.18959
-3. Hochreiter, S., & Schmidhuber, J. (1997). Long Short-Term Memory. *Neural Computation, 9*(8), 1735–1780. https://doi.org/10.1162/neco.1997.9.8.1735
+3. Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory*. *Neural Computation*, 9(8), 1735–1780. https://doi.org/10.1162/neco.1997.9.8.1735

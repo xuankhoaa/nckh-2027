@@ -1,223 +1,202 @@
-# Hướng dẫn A–Z: dự báo tỷ suất sinh lợi cổ phiếu ngân hàng bằng Mamba
+# Hướng dẫn A–Z: chạy và kiểm tra đề tài NCKH
 
-Tài liệu này mô tả chính xác những gì đã được tạo, dữ liệu đi vào đâu, kết quả đi ra đâu và cách lặp lại thí nghiệm.
+Tài liệu này mô tả đầy đủ luồng dữ liệu, cách chạy lại, cách kiểm tra kết quả và ý nghĩa các đầu ra. Bản hiện tại giải quyết **dự báo log-return một phiên kế tiếp** (Bài toán 1), không giải quyết trực tiếp dự báo biến động hay phân loại rủi ro.
 
-## A. Mục tiêu nghiên cứu
-
-Dự báo **log return của phiên giao dịch t+1** từ thông tin có đến cuối phiên **t**. Đây không phải là bài toán dự đoán raw closing price.
-
-Ba mô hình được so sánh:
-
-1. `lstm`: baseline tuần tự.
-2. `mamba_baseline`: lõi MambaStock, feature bắt nguồn từ OHLCV.
-3. `improved_mamba`: cùng lõi và thiết kế với baseline, thêm return của VN-Index.
-
-## B. Môi trường đã dùng
-
-- Windows, Python 3.13.
-- Virtual environment dùng chung: `C:\Users\nguye\.venv`.
-- Các gói: `vnstock`, `vnai`, `python-dotenv`, `pandas`, `scikit-learn`, `matplotlib`, `torch`.
-- Vnstock đọc API key từ `.env`; khóa không được ghi vào mã nguồn hay bảng kết quả.
-
-## C. Cấu trúc thư mục
+## A. Luồng tổng quát
 
 ```text
-NCKH/
-├── data/                         # CSV OHLCV cache từ Vnstock
-├── external/MambaStock/          # repository nền, giữ nguyên mamba.py và pscan.py
-├── models/
-│   ├── lstm.py                   # LSTM baseline
-│   └── mamba_model.py            # regression head gọi MambaStock gốc
-├── results/                      # bảng và biểu đồ sinh ra sau mỗi lần chạy
-├── get_data.py                   # lấy/cache dữ liệu
-├── preprocess.py                 # feature, split và sliding window
-├── train.py                      # chạy một model/một mã
-├── run_experiments.py            # chạy 3 model cho toàn bộ mã
-├── generate_report.py            # sinh báo cáo từ metrics.csv
-├── config.py                     # danh sách ticker và cấu hình split
-├── .env                          # API key thực, không commit
-├── .env.example                  # mẫu biến môi trường
-└── requirements.txt              # dependency
+OHLCV cổ phiếu + OHLCV VN-Index
+        ↓
+Kiểm tra chất lượng + đóng băng manifest
+        ↓
+Feature tại t + target return tại t+1
+        ↓
+Chia train / validation / test theo thời gian
+        ↓
+2 baseline + LSTM + 2 Selective SSM, lặp 5 seed
+        ↓
+CSV tiếng Việt + biểu đồ + báo cáo Markdown + manifest tái lập
 ```
 
-## D. Đầu vào dữ liệu
+## B. Điều kiện môi trường
 
-`get_data.py` lấy dữ liệu daily từ Vnstock nguồn KBS cho:
+Mã tải dữ liệu đang dùng `Quote` của **Vnstock 4.x**. Vì vậy, phải dùng một môi trường tách riêng cho dòng 4.x; không nâng cấp chồng Vnstock 5.x vào cùng môi trường.
 
-- Cổ phiếu: `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB`.
-- Chỉ số thị trường: `VNINDEX`.
+```powershell
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+Copy-Item .env.example .env
+```
 
-Schema CSV được kiểm tra trước khi ghi:
+Mở `.env` và điền khóa của bạn vào `VNSTOCK_API_KEY`. Tệp `.env` đã bị Git bỏ qua. Không gửi khóa qua chat, không đưa vào notebook, mã nguồn, kết quả hay commit.
 
-| Cột | Ý nghĩa |
-| --- | --- |
-| `time` | Ngày giao dịch, chuẩn `YYYY-MM-DD` |
-| `open`, `high`, `low`, `close` | OHLC giá ngày |
+Nếu chỉ chạy mô hình từ các CSV đã cache trong `data/`, bước tải dữ liệu không gọi mạng. Tuy nhiên, muốn **tải lại dữ liệu** thì vẫn cần Vnstock 4.x và khóa hợp lệ.
+
+## C. Đầu vào gốc
+
+`get_data.py` tải OHLCV ngày cho tám mã `VCB BID CTG MBB TCB ACB VPB STB` và luôn có `VNINDEX`. Mốc mặc định được khóa tại 01/01/2020–12/10/2026 để một lần chạy lại không âm thầm kéo dữ liệu mới hơn.
+
+| Cột CSV | Ý nghĩa |
+|---|---|
+| `time` | Ngày giao dịch, `YYYY-MM-DD` |
+| `open`, `high`, `low`, `close` | Giá mở, cao, thấp, đóng cửa |
 | `volume` | Khối lượng giao dịch |
 
-CSV đã có sẽ được dùng lại. Chỉ dùng `--force` khi chủ ý cập nhật nguồn dữ liệu.
-
-## E. Thiết lập API key an toàn
-
-Tạo `.env` cạnh `get_data.py` theo `.env.example`:
-
-```text
-VNSTOCK_API_KEY=your_api_key_here
-```
-
-`.gitignore` đã loại trừ `.env`. Không dán key vào code, notebook hoặc báo cáo.
-
-## F. Feature engineering
-
-Từ dữ liệu mỗi cổ phiếu:
-
-```text
-return_t        = log(close_t / close_(t-1))
-volume_change_t = volume_t / volume_(t-1) - 1
-high_low_range  = (high_t - low_t) / close_t
-```
-
-Từ VN-Index:
-
-```text
-vnindex_return_t = log(vnindex_close_t / vnindex_close_(t-1))
-```
-
-Feature baseline gồm OHLCV và ba đại lượng dẫn xuất ở trên. Improved Mamba thêm `vnindex_return`.
-
-## G. Target và sliding window
-
-Target là:
-
-```text
-target_return_t = return_(t+1)
-```
-
-Với `window=30`, một sample có dạng:
-
-```text
-X = [feature_(t-29), ..., feature_t]
-y = return_(t+1)
-```
-
-Tensor đi vào model có shape `[batch_size, 30, num_features]`; baseline có 8 feature, Improved Mamba có 9 feature. Chương trình in một sample alignment và assert `input_end_date < target_date` trước khi train.
-
-## H. Kiểm soát data leakage
-
-1. `target_return` và `target_date` được tạo bằng `shift(-1)`.
-2. Một sample được phân vào train/validation/test theo **ngày target**, không theo thứ tự ngẫu nhiên.
-3. `StandardScaler.fit()` chỉ dùng quan sát đến ngày input cuối cùng thuộc train.
-4. Validation và test không tham gia fit scaler, chọn epoch hay cập nhật trọng số.
-5. Cửa sổ test được phép nhìn về các ngày quá khứ, nhưng không nhìn bất kỳ feature nào sau ngày target.
-
-## I. Chia train/validation/test
-
-| Tập | Khoảng target date | Vai trò |
-| --- | --- | --- |
-| Train | đến 31/12/2023 | học trọng số và scaler |
-| Validation | năm 2024 | chọn epoch tốt nhất/early stopping |
-| Test | từ 01/01/2025 | chỉ đo kết quả cuối cùng |
-
-## J. MambaStock được tái sử dụng thế nào
-
-Repository nền nằm ở `external/MambaStock/`.
-
-- Giữ nguyên `mamba.py`: selective state-space blocks, residual blocks, RMSNorm.
-- Giữ nguyên `pscan.py`: selective scan song song.
-- Không dùng trực tiếp `main.py`: bản gốc gắn target `pct_chg` cho cùng hàng, không dùng fixed sliding windows, không có validation và quy đổi kết quả về close price. Các đặc điểm đó không khớp câu hỏi t → t+1.
-
-`models/mamba_model.py` chỉ thêm input projection và regression head lấy hidden state cuối của một window.
-
-## K. Huấn luyện một thực nghiệm
-
-LSTM cho VCB:
+Chạy tải/cache:
 
 ```powershell
-& C:\Users\nguye\.venv\Scripts\python.exe train.py --model lstm --ticker VCB --window 30 --epochs 75
+.\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
 ```
 
-Improved Mamba cho VCB:
+Mặc định một CSV đã tồn tại được dùng lại. Chỉ dùng `--force` khi chủ ý gọi nguồn và ghi đè snapshot:
 
 ```powershell
-& C:\Users\nguye\.venv\Scripts\python.exe train.py --model mamba --ticker VCB --include-vnindex --window 30 --epochs 75
+.\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB --force
 ```
 
-`train.py` dùng MSE loss, Adam, seed 42 và early stopping theo validation loss. Test chỉ được dự báo sau khi nạp lại trọng số validation tốt nhất.
+Sau bước này, `data/DATA_MANIFEST.json` lưu số dòng, ngày đầu/cuối, SHA-256 và cảnh báo dữ liệu. Đó là bằng chứng để người khác xác nhận đang dùng đúng đầu vào, không phải dữ liệu bí mật.
 
-## L. Chạy toàn bộ nhóm ngân hàng
+## D. Kiểm tra chất lượng dữ liệu
+
+`data_quality.py` không tự thay đổi số liệu nguồn. Nó chặn các lỗi thiếu cột, trùng ngày, thiếu dữ liệu, số không hữu hạn, giá OHLC không dương, `high < low`, khối lượng âm và `close` nằm ngoài `[low, high]` đối với cổ phiếu.
+
+Với VN-Index, nếu `close` ngoài phạm vi high–low, chương trình ghi **cảnh báo** vào manifest thay vì sửa hoặc xóa dòng. Trong pipeline hiện tại, VN-Index chỉ đóng góp `close` để tính return thị trường; cảnh báo vẫn phải được nêu minh bạch khi viết báo cáo.
+
+## E. Feature engineering
+
+Với giá đóng cửa cổ phiếu $P_t$, khối lượng $V_t$, high $H_t$, low $L_t$ và giá đóng cửa VN-Index $I_t$:
+
+$$
+\begin{aligned}
+r_t &= \ln(P_t/P_{t-1}),\\
+v_t &= V_t/V_{t-1}-1,\\
+q_t &= (H_t-L_t)/P_t,\\
+r_t^{VN} &= \ln(I_t/I_{t-1}).
+\end{aligned}
+$$
+
+Tám feature cơ sở là `open high low close volume return volume_change high_low_range`. Bản Selective SSM cải tiến thêm `vnindex_return` thành chín feature. `vnindex_return` là biến động chỉ số thị trường chung, không phải return của mã đang dự báo.
+
+## F. Target và cửa sổ trượt
+
+Mục tiêu là:
+
+$$
+y_t=r_{t+1}=\ln(P_{t+1}/P_t).
+$$
+
+Với `window=30`, một mẫu là $X_t=[x_{t-29},\ldots,x_t]$ và nhãn là $y_t$. Do đó input kết thúc ở ngày $t$, còn target luôn là phiên sau. Khi chạy một cấu hình, chương trình in ví dụ ghép ngày để kiểm chứng quan hệ này.
+
+## G. Chia dữ liệu và chống leakage
+
+| Tập | Quy tắc theo `target_date` | Được dùng làm gì |
+|---|---|---|
+| Train | `<= 2023-12-31` | Fit feature scaler, target scaler, trọng số |
+| Validation | Năm 2024 | Chọn epoch tốt nhất, early stopping |
+| Test | `>= 2025-01-01` | Chỉ đánh giá cuối |
+
+Mẫu không được shuffle. `StandardScaler.fit()` chỉ nhận các feature train. Mạng còn chuẩn hóa target bằng trung bình/độ lệch chuẩn của `y_train`; `y_valid` và `y_test` chỉ áp dụng đúng tham số đó. Dự báo được đảo chuẩn hóa sang log-return trước khi tính RMSE, MAE, $R^2$ và DA.
+
+## H. Mô hình và tính công bằng
+
+| Mô hình | Số tham số | Ý nghĩa |
+|---|---:|---|
+| `naive_zero` | 0 | Dự báo return bằng 0 |
+| `train_mean` | 0 | Dự báo trung bình return train |
+| `lstm` | 585 | Một lớp LSTM, hidden size 8 |
+| `mamba_baseline` | 545 | Một lớp Selective SSM, chỉ feature cơ sở |
+| `improved_mamba` | 553 | Selective SSM, thêm VN-Index |
+
+Mô hình Selective SSM được viết trong `models/mamba_model.py`, không gọi mã vendored từ MambaStock. Nó gồm RMSNorm, causal depthwise convolution, tham số chọn lọc $\Delta,B,C$, cổng SiLU, residual connection và selective scan. Test đơn vị kiểm tra selective scan theo cây cho kết quả tương đương truy hồi trạng thái tuần tự.
+
+## I. Chạy một cấu hình để kiểm tra
+
+Ví dụ LSTM cho VCB:
 
 ```powershell
-& C:\Users\nguye\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
-& C:\Users\nguye\.venv\Scripts\python.exe run_experiments.py --window 30 --epochs 75 --batch-size 128
-& C:\Users\nguye\.venv\Scripts\python.exe generate_report.py --window 30
+.\.venv\Scripts\python.exe train.py --model lstm --ticker VCB --seed 42 --window 30 --epochs 40
 ```
 
-Lệnh thứ hai chạy 8 mã × 3 mô hình. Kết quả cùng cấu hình sẽ được cập nhật, không nhân bản dòng cũ.
+Ví dụ Selective SSM có VN-Index cho VCB:
 
-## M. Metric đầu ra
+```powershell
+.\.venv\Scripts\python.exe train.py --model improved_mamba --ticker VCB --seed 42 --window 30 --epochs 40
+```
 
-| Metric | Cách diễn giải |
-| --- | --- |
-| RMSE | Sai số bình phương trung bình căn bậc hai; thấp hơn tốt hơn. |
-| MAE | Sai số tuyệt đối trung bình; thấp hơn tốt hơn. |
-| R² | Mức giải thích biến thiên; cao hơn tốt hơn. |
-| Directional Accuracy | Tỷ lệ dự báo cùng dấu với return thực tế; cao hơn tốt hơn. |
+`train.py` chỉ chạy đúng một cặp model–ticker–seed. Nó dùng Adam, `learning_rate=0.001`, batch size 128, tối đa 40 epoch và early stopping sau 8 epoch validation không cải thiện. Thực nghiệm riêng có thể thay đổi `--epochs`, `--batch-size`, `--window`, nhưng cần ghi rõ đó không còn là cấu hình chính.
 
-## N. Các tệp đầu ra
+## J. Chạy toàn bộ nghiên cứu
 
-| Tệp | Nội dung |
-| --- | --- |
-| `results/BANG_KET_QUA_CHI_TIET_VI.csv` | Bảng metric đầy đủ theo từng mã, cột tiếng Việt, mở đúng dấu trong Excel. |
-| `results/BANG_TONG_HOP_NHOM_VI.csv` | Trung bình và độ lệch chuẩn nhóm ngân hàng, cột tiếng Việt. |
-| `results/DU_BAO_THEO_NGAY_VI.csv` | Dự báo từng ngày test, cột tiếng Việt. |
-| `results/metrics.csv` | Một dòng cho mỗi model × ticker, gồm bốn metric. |
-| `results/predictions.csv` | `date`, `ticker`, model, actual return, predicted return. |
-| `results/group_summary.csv` | Mean và standard deviation theo mô hình trên 8 mã. |
-| `results/BAO_CAO_KET_QUA.md` | Bảng chi tiết và bảng trung bình được tạo tự động. |
-| `results/bieu_do/tung_ma/` | Biểu đồ return thật/dự báo, loss và so sánh metric cho từng mã. |
-| `results/bieu_do/tong_hop/` | Biểu đồ RMSE, MAE và directional accuracy trung bình toàn nhóm. |
+```powershell
+.\.venv\Scripts\python.exe run_experiments.py
+```
 
-## O. Cách dùng cho báo cáo NCKH
+Lệnh này tự xóa đúng output sinh tự động cũ, sau đó chạy:
 
-1. Trích xuất bảng trong `BAO_CAO_KET_QUA.md` hoặc `metrics.csv`.
-2. Báo cáo mean ± standard deviation ở `group_summary.csv` thay vì chỉ chọn một mã đẹp nhất.
-3. So sánh Mamba baseline với Improved Mamba cho cùng ticker trước, sau đó so sánh trung bình nhóm.
-4. Khi metric xấu hoặc R² âm, báo cáo trung thực và thảo luận rằng dự báo return ngắn hạn rất nhiễu; không sửa số liệu.
-5. Thử window 60/90 hoặc nhiều seed như thực nghiệm tiếp theo, lập kế hoạch trước và không chọn theo test set.
+$$
+8\ \text{mã} \times (2\ \text{baseline}+3\ \text{mạng}\times5\ \text{seed})=136\ \text{lần chạy}.
+$$
 
-## P. Các giới hạn hiện tại
+Năm seed là `42, 52, 62, 72, 82`; baseline hằng dùng seed 0. Dùng `--keep-results` chỉ khi chủ ý tiếp tục đúng schema cũ, vì kết quả thiếu hoặc lẫn cấu hình sẽ làm báo cáo không hợp lệ.
 
-- Đây là dự báo one-day-ahead return, không phải khuyến nghị giao dịch.
-- Chưa có transaction cost, backtest, tin tức hay sentiment.
-- Chỉ có một seed cho cấu hình chính; cần nhiều seed trước khi kết luận mạnh.
-- Dữ liệu phụ thuộc vào nguồn Vnstock và các ngày giao nhau với VN-Index.
+## K. Sinh báo cáo tiếng Việt
 
-## Q. Mở rộng hợp lý tiếp theo
+Khi 136 lần chạy xong:
 
-Sau khi chốt bảng 30 ngày, chạy lại toàn bộ với `--window 60` và `--window 90`, rồi thêm cột window vào phân tích. Chỉ nghiên cứu RSS/news sau khi các thí nghiệm lõi đã ổn định.
+```powershell
+.\.venv\Scripts\python.exe generate_report.py --window 30
+```
 
-## R. Kiểm tra nhanh khi có lỗi
+Lệnh chỉ chấp nhận đủ 136 dòng metric của cấu hình chính. Nó tạo:
 
-- Thiếu key: xem `.env.example`, đảm bảo `.env` có `VNSTOCK_API_KEY`.
-- Thiếu CSV: chạy lại `get_data.py` cho mã cần dùng.
-- Muốn cập nhật nguồn: thêm `--force`.
-- Thiếu package: dùng đúng Python trong `C:\Users\nguye\.venv`.
-- Không khớp dữ liệu: `preprocess.py` sẽ báo lỗi thiếu cột hoặc không có sequence thay vì âm thầm tiếp tục.
+| Đầu ra | Mục đích |
+|---|---|
+| `results/BANG_KET_QUA_CHI_TIET_VI.csv` | Mọi metric theo mã, mô hình, seed |
+| `results/BANG_TONG_HOP_NHOM_VI.csv` | Mean và độ lệch chuẩn giữa mã/seed |
+| `results/DU_BAO_THEO_NGAY_VI.csv` | Actual/predicted log-return theo ngày test |
+| `results/KIEM_DINH_HAC_VI.csv` | So sánh squared loss với zero return |
+| `results/BAO_CAO_KET_QUA.md` | Tóm tắt tự sinh từ kết quả |
+| `bao_cao/BAO_CAO_NCKH.md` | Bản Markdown đầy đủ để chuyển thành Word sau này |
+| `results/bieu_do/` | Biểu đồ loss, dự báo–thực tế, so sánh nhóm |
 
-## S. Tính tái lập
+CSV tiếng Việt được lưu UTF-8 with BOM (`utf-8-sig`) để mở bằng Excel tiếng Việt mà không lỗi dấu.
 
-Seed mặc định là 42. Mỗi dòng metrics mang ticker, model, window và feature set. Giữ nguyên CSV cache cùng lệnh chạy để tái lập kết quả.
+## L. Đọc metric đúng cách
 
-## T. Điều không được làm
+| Metric | Cách đọc |
+|---|---|
+| RMSE | Càng nhỏ càng tốt; nhạy với lỗi lớn |
+| MAE | Càng nhỏ càng tốt; sai số tuyệt đối trung bình |
+| $R^2$ | Càng lớn càng tốt; âm nghĩa là kém baseline trung bình test theo chỉ số này |
+| DA | Tỷ lệ đúng dấu return; phải đọc cùng RMSE/MAE |
 
-- Không hard-code API key.
-- Không fit scaler trên toàn bộ dữ liệu.
-- Không shuffle time split.
-- Không dùng return t+1 trong input.
-- Không thay kết quả thật bằng số liệu minh họa.
+Kiểm định HAC được tính trên chênh lệch squared loss giữa một seed mạng và baseline zero ở các ngày test tương ứng. “Cải thiện MSE so với zero” dương nghĩa là mạng giảm loss trung bình. p-value là bằng chứng hỗ trợ, không thay thế việc xem độ lớn sai số, độ bền qua seed và từng mã.
 
-## U. Kết luận vận hành
+## M. Xác minh trước khi nộp
 
-Toàn bộ luồng là: **Vnstock CSV → feature tại t → sliding window → LSTM/Mamba → return t+1 → CSV/biểu đồ/báo cáo**.
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m compileall -q .
+.\.venv\Scripts\python.exe verify_project.py --require-results
+```
 
-Các chữ cái còn lại V–Z không biểu thị bước kỹ thuật mới; chúng nhấn mạnh yêu cầu cuối: kiểm tra kết quả, xác minh leakage, lưu output, và trình bày trung thực trong báo cáo.
+Test bao phủ kiểm tra OHLCV, target sau input, scaler không bị ảnh hưởng bởi giá trị tương lai, output model, selective scan và metric hoàn hảo. `verify_project.py` kiểm tra layout mã, cache dữ liệu, đủ 136 lần chạy, tính hữu hạn của dự báo/metric và ghép đúng predictions với metrics.
+
+## N. Git và dọn dẹp
+
+`.env`, `data/`, `results/`, checkpoint và Python cache bị Git bỏ qua. Chúng là secret, input thô hoặc output tái tạo được. Mã, test, tài liệu, cấu hình và báo cáo Markdown nguồn được giữ lại. Không chạy lệnh xóa dữ liệu gốc khi chưa sao lưu hoặc chưa xác nhận đúng snapshot cần loại bỏ.
+
+## O. Các lỗi thường gặp
+
+| Hiện tượng | Cách xử lý |
+|---|---|
+| `No module named vnstock` | Dùng đúng Python trong `.venv`, cài theo `requirements.txt`; giữ Vnstock 4.x |
+| Thiếu `VNSTOCK_API_KEY` | Tạo `.env` từ `.env.example`, đặt khóa tại máy cục bộ; không commit |
+| Thiếu CSV | Chạy `get_data.py` cho mã cần thiết |
+| Báo thiếu 136 dòng metric | Chạy lại `run_experiments.py` không dùng `--keep-results` |
+| Lỗi dấu tiếng Việt trong Excel | Mở các tệp hậu tố `_VI.csv`; chúng đã dùng UTF-8 BOM |
+| Kết quả khác đôi chút giữa máy | Xác minh `EXPERIMENT_MANIFEST.json`, SHA-256 dữ liệu, phiên bản gói và CPU/GPU |
+
+## P. Phạm vi kết luận
+
+Kết quả chỉ mô tả hiệu quả trên snapshot dữ liệu, horizon một phiên, feature và siêu tham số đã công bố. Không suy rộng thành hiệu quả đầu tư thực tế. Để mở rộng sang Bài toán 2, cần tạo volatility target tương lai; sang Bài toán 3, cần nhãn rủi ro tương lai và mô hình classification với macro-F1/balanced accuracy. Cả hai có thể làm được, nhưng cần thiết kế thí nghiệm độc lập để không làm lẫn mục tiêu với Bài toán 1.
