@@ -12,6 +12,7 @@ from typing import Iterable
 
 import torch
 
+from console import configure_utf8_output
 from config import DATA_SOURCE, TICKERS
 from data_quality import sha256_file, write_data_manifest
 from evaluate import RESULTS_DIR
@@ -25,6 +26,7 @@ SOURCE_FILES = (
     "baselines.py",
     "models/lstm.py",
     "models/mamba_model.py",
+    "console.py",
     "train.py",
     "evaluate.py",
     "run_experiments.py",
@@ -101,6 +103,7 @@ def write_experiment_manifest(
 
 
 def main() -> None:
+    configure_utf8_output()
     write_experiment_manifest(window=30, seeds=(42, 52, 62, 72, 82), tickers=TICKERS, epochs=40, batch_size=128, started_at=datetime.now(timezone.utc).isoformat())
 
 

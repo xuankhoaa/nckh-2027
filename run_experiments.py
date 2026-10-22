@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 
+from console import configure_utf8_output
 from config import DEFAULT_WINDOW, RESEARCH_SEEDS, TICKERS
 from evaluate import plot_group_metric_comparison, reset_generated_results
 from provenance import write_experiment_manifest
@@ -58,4 +59,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

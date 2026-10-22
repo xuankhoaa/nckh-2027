@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-import sys
 import warnings
 
 import pandas as pd
@@ -18,6 +17,7 @@ except ImportError:  # Cho phép kiểm tra/cache dữ liệu sẵn có mà khô
     Quote = None
 
 from config import DATA_END, DATA_SOURCE, DATA_START
+from console import configure_utf8_output
 from data_quality import REQUIRED_OHLCV, validate_ohlcv, write_data_manifest
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -90,15 +90,13 @@ def parse_args() -> argparse.Namespace:
         "--symbols",
         nargs="+",
         default=["VCB"],
-        help="Stock tickers to cache; VNINDEX is always included.",
+        help="Các mã cổ phiếu cần lưu cache; VNINDEX luôn được bổ sung.",
     )
-    parser.add_argument("--force", action="store_true", help="Refresh existing CSV files.")
+    parser.add_argument("--force", action="store_true", help="Tải lại và ghi đè các CSV đã có.")
     return parser.parse_args()
 
 
 def main() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     load_dotenv(PROJECT_DIR / ".env")
     args = parse_args()
     symbols = [*dict.fromkeys([*args.symbols, "VNINDEX"])]
@@ -116,4 +114,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

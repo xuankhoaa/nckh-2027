@@ -13,6 +13,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from baselines import predict_baseline
+from console import configure_utf8_output
 from evaluate import (
     plot_actual_vs_predicted,
     plot_learning_curve,
@@ -199,12 +200,13 @@ def parse_args() -> Experiment:
     parser.add_argument("--window", type=int, default=30)
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
-    parser.add_argument("--hidden-size", type=int, default=16)
-    parser.add_argument("--layers", type=int, default=2)
+    parser.add_argument("--hidden-size", type=int, default=8)
+    parser.add_argument("--layers", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--patience", type=int, default=12)
+    parser.add_argument("--patience", type=int, default=8)
     return Experiment(**vars(parser.parse_args()))
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     run_experiment(parse_args(), show_alignment=True)

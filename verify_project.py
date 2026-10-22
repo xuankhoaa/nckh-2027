@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from console import configure_utf8_output
 from config import RESEARCH_SEEDS, TICKERS
 from data_quality import data_inventory
 from evaluate import RESULTS_DIR
@@ -26,6 +26,7 @@ def assert_source_layout() -> None:
         "run_experiments.py",
         "evaluate.py",
         "generate_report.py",
+        "console.py",
         "models/lstm.py",
         "models/mamba_model.py",
     )
@@ -74,8 +75,6 @@ def assert_experiment_outputs() -> None:
 
 
 def main() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Xác minh thành phần chính của đề tài NCKH.")
     parser.add_argument(
         "--require-results",
@@ -93,4 +92,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

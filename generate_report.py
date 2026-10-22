@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
 
+from console import configure_utf8_output
 from evaluate import RESULTS_DIR, per_ticker_summary, save_group_summary
 
 
 MODEL_ORDER = {"naive_zero": 0, "train_mean": 1, "lstm": 2, "mamba_baseline": 3, "improved_mamba": 4}
 MODEL_NAMES = {
-    "naive_zero": "Baseline zero return",
+    "naive_zero": "Baseline return bằng 0",
     "train_mean": "Baseline trung bình train",
     "lstm": "LSTM",
     "mamba_baseline": "Selective SSM cơ sở",
@@ -107,10 +107,6 @@ def vietnamese_summary(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
-    # PowerShell cũ có thể mặc định cp1252; bảo đảm thông báo tiếng Việt không
-    # làm hỏng một lượt sinh báo cáo vốn đã hoàn tất ghi tệp.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Sinh báo cáo NCKH Markdown và CSV tiếng Việt.")
     parser.add_argument("--window", type=int, default=30)
     args = parser.parse_args()
@@ -138,7 +134,7 @@ def main() -> None:
     summary_vi = vietnamese_summary(summary)
     tests_vi = tests.copy()
     tests_vi["model"] = tests_vi["model"].map(MODEL_NAMES)
-    tests_vi = tests_vi.rename(columns={"model": "Mô hình", "ticker": "Mã", "seed": "Seed", "n_test": "Số phiên test", "mean_squared_error_improvement": "Cải thiện MSE so với zero", "hac_statistic": "Thống kê HAC", "p_value_two_sided": "p hai phía"})
+    tests_vi = tests_vi.rename(columns={"model": "Mô hình", "ticker": "Mã", "seed": "Seed", "n_test": "Số phiên test", "mean_squared_error_improvement": "Cải thiện MSE so với baseline 0", "hac_statistic": "Thống kê HAC", "p_value_two_sided": "p hai phía"})
     detail_vi.to_csv(RESULTS_DIR / "BANG_KET_QUA_CHI_TIET_VI.csv", index=False, encoding="utf-8-sig")
     summary_vi.to_csv(RESULTS_DIR / "BANG_TONG_HOP_NHOM_VI.csv", index=False, encoding="utf-8-sig")
     tests_vi.to_csv(RESULTS_DIR / "KIEM_DINH_HAC_VI.csv", index=False, encoding="utf-8-sig")
@@ -181,7 +177,7 @@ def main() -> None:
 - Dữ liệu: OHLCV hằng ngày và VN-Index, snapshot kết thúc ngày {manifest["data_manifest"]["files"][0]["end"]}.
 - Nhiệm vụ: dùng cửa sổ {args.window} phiên kết thúc tại t để dự báo log return ở t+1.
 - Chia thời gian: train đến 31/12/2023; validation trong năm 2024; test từ 01/01/2025.
-- Mô hình: baseline zero return, baseline trung bình train, LSTM, Selective SSM cơ sở và Selective SSM có thêm return VN-Index.
+- Mô hình: baseline return bằng 0, baseline trung bình train, LSTM, Selective SSM cơ sở và Selective SSM có thêm return VN-Index.
 - Seed mạng: {", ".join(map(str, manifest["experiment"]["seeds"]))}. Baseline là xác định nên chỉ có seed 0.
 - Git HEAD: `{manifest["git_commit"]}`; worktree có thay đổi chưa commit tại lúc ghi manifest: {git_dirty}. SHA-256 các tệp mã chính nằm trong `EXPERIMENT_MANIFEST.json`. Python {manifest["python"]}; PyTorch {manifest["packages"]["torch"]}; chạy CUDA: {manifest["cuda_available"]}.
 
@@ -191,11 +187,11 @@ def main() -> None:
 
 ## 3. Diễn giải có kiểm soát
 
-Mô hình có RMSE trung bình thấp nhất trong lần chạy này là **{winner}**. Trong các mạng nơ-ron, **{MODEL_NAMES[best_neural_row["model"]]}** có RMSE trung bình {best_neural_row["rmse_mean"]:.6f}, cao hơn baseline trung bình train ({baseline_row["rmse_mean"]:.6f}) một lượng {neural_gap:.6f}. Vì vậy, thiết lập hiện tại **chưa cho thấy mạng nơ-ron giảm sai số trung bình nhóm so với baseline train mean**. Selective SSM thêm VN-Index có RMSE chênh {vnindex_gap:+.6f} so với Selective SSM cơ sở; dấu dương nghĩa là không có cải thiện RMSE trong lần chạy này. Kết luận chỉ áp dụng cho snapshot dữ liệu, tập đặc trưng, khoảng thời gian và siêu tham số đã nêu. RMSE/MAE đo độ lớn sai số; DA đo đúng chiều biến động; vì vậy không được chọn mô hình chỉ theo DA. Nếu R² âm, mô hình còn kém hơn dự báo hằng bằng trung bình tập test theo thước đo R².
+Mô hình có RMSE trung bình thấp nhất trong lần chạy này là **{winner}**. Trong các mạng nơ-ron, **{MODEL_NAMES[best_neural_row["model"]]}** có RMSE trung bình {best_neural_row["rmse_mean"]:.6f}, cao hơn baseline trung bình train ({baseline_row["rmse_mean"]:.6f}) một lượng {neural_gap:.6f}. Vì vậy, thiết lập hiện tại **chưa cho thấy mạng nơ-ron giảm sai số trung bình nhóm so với baseline trung bình train**. Selective SSM thêm VN-Index có RMSE chênh {vnindex_gap:+.6f} so với Selective SSM cơ sở; dấu dương nghĩa là không có cải thiện RMSE trong lần chạy này. Kết luận chỉ áp dụng cho snapshot dữ liệu, tập đặc trưng, khoảng thời gian và siêu tham số đã nêu. RMSE/MAE đo độ lớn sai số; DA đo đúng chiều biến động; vì vậy không được chọn mô hình chỉ theo DA. Nếu R² âm, mô hình còn kém hơn dự báo hằng bằng trung bình tập test theo thước đo R².
 
 ## 4. Kiểm định chênh lệch squared loss
 
-Tệp `KIEM_DINH_HAC_VI.csv` so sánh từng seed mạng với baseline zero return trên cùng ngày kiểm tra. Cột “Cải thiện MSE so với zero” dương nghĩa là mạng giảm squared loss trung bình. p-value dùng xấp xỉ chuẩn với phương sai HAC; đây là bằng chứng bổ sung, không thay thế việc đọc RMSE/MAE và phân tích từng mã.
+Tệp `KIEM_DINH_HAC_VI.csv` so sánh từng seed mạng với baseline return bằng 0 trên cùng ngày kiểm tra. Cột “Cải thiện MSE so với baseline 0” dương nghĩa là mạng giảm squared loss trung bình. p-value dùng xấp xỉ chuẩn với phương sai HAC; đây là bằng chứng bổ sung, không thay thế việc đọc RMSE/MAE và phân tích từng mã.
 
 ## 5. Kiểm soát tái lập và chất lượng dữ liệu
 
@@ -320,4 +316,5 @@ Giới hạn quan trọng gồm: chỉ một khoảng test hậu 2025; chưa có
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
     main()

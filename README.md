@@ -74,7 +74,21 @@ $$
 8\ \text{mã}\times\left(2\ \text{baseline}+3\ \text{mạng}\times5\ \text{seed}\right)=136.
 $$
 
-Các metric trên test gồm RMSE, MAE, $R^2$ và Directional Accuracy (DA). Báo cáo còn có kiểm định chênh lệch squared loss với phương sai HAC khi so sánh mỗi seed mạng với baseline zero return. Không chọn mô hình chỉ theo DA; RMSE/MAE đo độ lớn sai số. $R^2$ âm phải được báo cáo trung thực, vì nó cho thấy mô hình kém hơn dự báo hằng bằng trung bình tập test theo thước đo đó.
+Các metric trên test gồm RMSE, MAE, $R^2$ và Directional Accuracy (DA). Báo cáo còn có kiểm định chênh lệch squared loss với phương sai HAC khi so sánh mỗi seed mạng với baseline return bằng 0. Không chọn mô hình chỉ theo DA; RMSE/MAE đo độ lớn sai số. $R^2$ âm phải được báo cáo trung thực, vì nó cho thấy mô hình kém hơn dự báo hằng bằng trung bình tập test theo thước đo đó.
+
+## Kết quả của lượt chạy đã kiểm chứng
+
+Lượt chạy đầy đủ với snapshot dữ liệu đến 12/10/2026 đã hoàn thành đủ 136 cấu hình. Bảng sau là trung bình nhóm trên tám mã; với RMSE và MAE, **nhỏ hơn là tốt hơn**.
+
+| Mô hình | RMSE | MAE | $R^2$ | DA |
+|---|---:|---:|---:|---:|
+| Baseline return bằng 0 | 0,018928 | 0,012859 | -0,001364 | 0,078588 |
+| Baseline trung bình train | **0,018918** | 0,012899 | -0,000482 | 0,462415 |
+| LSTM | 0,019195 | 0,013171 | -0,030056 | 0,459055 |
+| Selective SSM cơ sở | 0,019145 | 0,013180 | -0,024805 | 0,459510 |
+| Selective SSM có VN-Index | 0,019156 | 0,013211 | -0,026057 | 0,461048 |
+
+Kết luận đúng với cấu hình hiện tại là: baseline trung bình train có RMSE thấp nhất; mạng tốt nhất là Selective SSM cơ sở nhưng chưa vượt baseline. Đây là kết quả âm có giá trị khoa học, không phải lỗi bị che giấu. Bảng theo từng mã, độ lệch chuẩn seed, kiểm định HAC và diễn giải đầy đủ nằm trong [báo cáo NCKH](bao_cao/BAO_CAO_NCKH.md).
 
 ## Cài đặt và chạy lại
 
@@ -86,16 +100,29 @@ py -3.13 -m venv .venv
 Copy-Item .env.example .env
 ```
 
-Sau khi điền `VNSTOCK_API_KEY` vào `.env`, luồng tái lập là:
+`VNSTOCK_API_KEY` chỉ cần khi tải mới hoặc làm mới CSV. Nếu sử dụng snapshot CSV đã cache trong `data/`, có thể bỏ qua `get_data.py` và không cần gọi API. Khi cần tải dữ liệu, điền khóa vào `.env` rồi chạy:
 
 ```powershell
 .\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
+```
+
+Chạy lại thí nghiệm từ snapshot dữ liệu hiện có:
+
+```powershell
 .\.venv\Scripts\python.exe run_experiments.py
 .\.venv\Scripts\python.exe generate_report.py --window 30
 .\.venv\Scripts\python.exe verify_project.py --require-results
 ```
 
 Mặc định `get_data.py` tái sử dụng CSV đã cache. Chỉ thêm `--force` khi chủ ý ghi đè snapshot dữ liệu. `run_experiments.py` tự xóa đúng các output tái tạo được trước một lượt chạy mới; dùng `--keep-results` chỉ khi hiểu rõ mình đang tiếp tục tập kết quả cùng schema.
+
+Trước khi nộp hoặc sau khi chỉnh mã, kiểm tra nhanh bằng:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m compileall -q .
+.\.venv\Scripts\python.exe verify_project.py --require-results
+```
 
 ## Đầu ra
 
@@ -107,7 +134,7 @@ Tất cả kết quả sinh tự động ở `results/` (được Git bỏ qua v
 | `BANG_KET_QUA_CHI_TIET_VI.csv` | 136 metric theo mã, mô hình và seed; tiêu đề tiếng Việt |
 | `BANG_TONG_HOP_NHOM_VI.csv` | Trung bình và độ lệch chuẩn giữa mã/seed |
 | `DU_BAO_THEO_NGAY_VI.csv` | Log-return thực tế và dự báo từng ngày test; tiêu đề tiếng Việt |
-| `KIEM_DINH_HAC_VI.csv` | Kiểm định chênh lệch squared loss so với zero return |
+| `KIEM_DINH_HAC_VI.csv` | Kiểm định chênh lệch squared loss so với baseline return bằng 0 |
 | `BAO_CAO_KET_QUA.md` | Báo cáo tóm tắt sinh tự động từ chính các CSV |
 | `bieu_do/` | Learning curve, thực tế–dự báo và biểu đồ metric nhóm |
 
@@ -128,6 +155,7 @@ Tất cả kết quả sinh tự động ở `results/` (được Git bỏ qua v
 | `run_experiments.py` | Chạy đầy đủ 136 cấu hình |
 | `evaluate.py` | Metric, CSV và biểu đồ |
 | `generate_report.py` | Báo cáo/bảng tiếng Việt từ kết quả |
+| `console.py` | Chuẩn hóa đầu ra UTF-8 cho các lệnh chính trên Windows |
 | `verify_project.py` | Xác minh mã, dữ liệu cache và output |
 | `tests/` | Test chất lượng dữ liệu, leakage, scan và metric |
 
@@ -144,3 +172,5 @@ Tất cả kết quả sinh tự động ở `results/` (được Git bỏ qua v
 1. Gu, A., & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752. https://arxiv.org/abs/2312.00752
 2. Shi, Z. (2024). *MambaStock: Selective State Space Model for Stock Prediction*. arXiv:2402.18959. https://arxiv.org/abs/2402.18959
 3. Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory*. *Neural Computation*, 9(8), 1735–1780. https://doi.org/10.1162/neco.1997.9.8.1735
+4. Hyndman, R. J., & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. https://otexts.com/fpp3/
+5. Newey, W. K., & West, K. D. (1987). A Simple, Positive Semi-definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. *Econometrica*, 55(3), 703–708. https://doi.org/10.2307/1913610
