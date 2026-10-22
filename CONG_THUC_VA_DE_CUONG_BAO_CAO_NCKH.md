@@ -314,43 +314,7 @@ Các bảng và biểu đồ đã sinh có thể chèn vào Chương Kết quả
 - `results/bieu_do/tung_ma/`: biểu đồ từng mã.
 - `results/bieu_do/tong_hop/`: biểu đồ tổng hợp.
 
-## 12. Đề cương báo cáo NCKH khuyến nghị
-
-Nếu trường chưa có mẫu bắt buộc, có thể dùng cấu trúc sau. Nhiều hướng dẫn trình bày báo cáo khoa học dùng mạch: tóm tắt, từ khóa, giới thiệu, phương pháp, kết quả và thảo luận, kết luận, tài liệu tham khảo; yêu cầu riêng của trường luôn được ưu tiên hơn đề cương này.
-
-1. **Trang bìa, trang phụ bìa, lời cam đoan, lời cảm ơn, mục lục, danh mục bảng và hình.**
-2. **Tóm tắt** (khoảng 200–300 từ): vấn đề, dữ liệu, hai baseline và ba mô hình mạng, kết quả chính và đóng góp. Thêm từ khóa: *dự báo tỷ suất sinh lợi; cổ phiếu ngân hàng; Selective SSM; LSTM; VN-Index*.
-3. **Chương 1 — Mở đầu**
-   - Lý do chọn đề tài và tính cấp thiết.
-   - Mục tiêu tổng quát, mục tiêu cụ thể.
-   - Câu hỏi nghiên cứu: Mamba có giảm sai số dự báo return ngày kế tiếp so với LSTM không? Việc thêm return VN-Index có cải thiện kết quả không?
-   - Đối tượng, phạm vi: 8 mã ngân hàng; dữ liệu 2020–2026; dự báo 1 phiên kế tiếp.
-   - Đóng góp: pipeline tránh rò rỉ dữ liệu, hai baseline, lặp năm seed và kết quả thực nghiệm trên ngân hàng Việt Nam.
-4. **Chương 2 — Tổng quan nghiên cứu và cơ sở lý thuyết**
-   - Tổng quan dự báo chuỗi thời gian tài chính.
-   - LSTM và các nghiên cứu liên quan.
-   - State Space Model, Mamba và MambaStock.
-   - Khoảng trống nghiên cứu: áp dụng/đánh giá Mamba trên nhóm cổ phiếu ngân hàng Việt Nam với quy trình chia thời gian rõ ràng.
-5. **Chương 3 — Dữ liệu và phương pháp nghiên cứu**
-   - Nguồn dữ liệu, phạm vi thời gian, danh sách mã.
-   - Làm sạch, feature dẫn xuất và các công thức ở Mục 3.
-   - Tạo target, cửa sổ trượt, chuẩn hóa và chia train/validation/test.
-   - Kiến trúc LSTM, Mamba cơ sở, Improved Mamba.
-   - Thiết lập thực nghiệm, phần cứng/phần mềm, siêu tham số và thước đo.
-6. **Chương 4 — Kết quả và thảo luận**
-   - Thống kê mô tả dữ liệu.
-   - Bảng kết quả tổng hợp và bảng theo từng mã.
-   - Biểu đồ actual–predicted/loss; phân tích trường hợp Mamba tốt hoặc chưa tốt.
-   - So sánh công bằng giữa các baseline và mô hình mạng; thảo luận $R^2$ âm, nhiễu thị trường, giới hạn chưa dùng tin tức/sentiment.
-7. **Kết luận và kiến nghị**
-   - Trả lời từng mục tiêu/câu hỏi nghiên cứu bằng số liệu.
-   - Nêu giới hạn; đề xuất mở rộng Bài toán 2 (volatility) hoặc Bài toán 3 (risk classification) ở nghiên cứu sau.
-8. **Tài liệu tham khảo**: dùng một chuẩn thống nhất (APA 7 hoặc IEEE theo quy định trường).
-9. **Phụ lục**: bảng mã, tham số đầy đủ, mô tả cấu trúc thư mục, hướng dẫn chạy. Không cần dán toàn bộ mã nguồn vào thân báo cáo.
-
-Với dạng bài báo ngắn/hội nghị, rút gọn thành: **Tiêu đề – Tóm tắt – Từ khóa – 1. Giới thiệu – 2. Phương pháp – 3. Kết quả và thảo luận – 4. Kết luận – Tài liệu tham khảo**.
-
-## 13. Tài liệu tham khảo khởi đầu
+## 12. Tài liệu tham khảo khởi đầu
 
 Các mục dưới đây là tài liệu nền tảng; khi nộp chính thức cần trình bày lại theo chuẩn trích dẫn của trường.
 
@@ -360,10 +324,10 @@ Các mục dưới đây là tài liệu nền tảng; khi nộp chính thức c
 4. Hướng dẫn trình bày báo cáo Hội nghị NCKH quốc gia về Nghiên cứu và Giảng dạy Sinh học ở Việt Nam lần thứ 7. Trường Đại học Sư phạm – Đại học Thái Nguyên. https://bio.tnue.edu.vn/tin-hoat-dong/huong-dan-ban-thao-va-trinh-bay-bao-cao-khoa-hoc-tai-hoi-nghi-khoa-hoc-quoc-gia-ve-nghien-cuu-va-giang-day-sinh-hoc-o-viet-nam-lan-thu-7-2026
 5. Sổ tay công tác nghiên cứu khoa học sinh viên. Trường Đại học Nông Lâm – Đại học Thái Nguyên. https://tuaf.edu.vn/images/docs/2021/06/07/20210607095440so-tay-nckh-pdf.pdf
 
-## 14. Lưu ý khi viết để báo cáo đáng tin cậy
+## 13. Lưu ý khi viết để báo cáo đáng tin cậy
 
 - Chỉ mô tả những gì đã chạy: không ghi sentiment, volatility forecast hay phân loại rủi ro như một thành phần đã có.
 - Phân biệt rõ **return của cổ phiếu** $r_t$ với **return VN-Index** $r_t^{(VN)}$.
 - Báo cáo cả chỉ số tốt lẫn hạn chế. Không che $R^2$ âm hoặc chỉ chọn DA để kết luận.
 - Khi so sánh, dùng cùng dữ liệu, cùng cách chia thời gian, cùng cửa sổ 30 phiên và cùng thước đo cho mọi mô hình.
-- Nếu trường cung cấp mẫu bìa, định dạng trang hoặc mẫu biểu riêng, mẫu đó có ưu tiên cao hơn đề cương này.
+- Nếu trường cung cấp mẫu bìa, định dạng trang hoặc mẫu biểu riêng, hãy tuân thủ đúng mẫu đó.
