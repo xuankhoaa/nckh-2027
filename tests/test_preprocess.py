@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from config import TimeSplit
-from preprocess import build_feature_frame, make_sequence_split
+from preprocess import aggregate_news_features, build_feature_frame, make_sequence_split
 
 
 def write_ohlcv(path: Path, scale: float = 1.0, late_spike: bool = False) -> None:
@@ -56,3 +56,43 @@ class PreprocessTests(unittest.TestCase):
             first_set = make_sequence_split(build_feature_frame("VCB", first_dir), False, 10, split)
             second_set = make_sequence_split(build_feature_frame("VCB", second_dir), False, 10, split)
             np.testing.assert_allclose(first_set.x_train, second_set.x_train)
+
+    def test_volatility_target_uses_only_next_five_returns(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            self.make_data(directory)
+            frame = build_feature_frame("VCB", directory, volatility_horizon=5)
+            row = frame.iloc[10]
+            full = pd.read_csv(directory / "VCB.csv")
+            returns = np.log(full["close"] / full["close"].shift(1))
+            source_index = full.index[full["time"].eq(row["time"].strftime("%Y-%m-%d"))][0]
+            expected = np.sqrt(np.mean(np.square(returns.iloc[source_index + 1 : source_index + 6])))
+            self.assertAlmostEqual(row["target_volatility"], expected)
+            self.assertEqual(
+                row["target_volatility_date"],
+                pd.Timestamp(full.iloc[source_index + 5]["time"]),
+            )
+
+    def test_news_after_cutoff_and_weekend_move_to_next_trading_day(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            news_path = directory / "news.csv"
+            pd.DataFrame(
+                {
+                    "published_at": [
+                        "2023-01-06T14:00:00+07:00",
+                        "2023-01-06T16:00:00+07:00",
+                        "2023-01-07T10:00:00+07:00",
+                    ],
+                    "ticker": ["VCB", "VCB", "VCB"],
+                    "sentiment_score": [0.5, -0.5, 1.0],
+                }
+            ).to_csv(news_path, index=False)
+            trading_dates = pd.Series(pd.bdate_range("2023-01-02", periods=10))
+            daily = aggregate_news_features(news_path, "VCB", trading_dates, cutoff_hour=15)
+            friday = daily.loc[daily["time"].eq(pd.Timestamp("2023-01-06"))].iloc[0]
+            monday = daily.loc[daily["time"].eq(pd.Timestamp("2023-01-09"))].iloc[0]
+            self.assertEqual(friday["news_count"], 1)
+            self.assertAlmostEqual(friday["sentiment_score"], 0.5)
+            self.assertEqual(monday["news_count"], 2)
+            self.assertAlmostEqual(monday["sentiment_score"], 0.25)

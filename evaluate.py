@@ -17,10 +17,15 @@ import matplotlib.pyplot as plt  # noqa: E402
 RESULTS_DIR = Path("results")
 PER_TICKER_PLOTS_DIR = RESULTS_DIR / "bieu_do" / "tung_ma"
 GROUP_PLOTS_DIR = RESULTS_DIR / "bieu_do" / "tong_hop"
-METRIC_NAMES = ("rmse", "mae", "r2", "directional_accuracy")
+METRIC_NAMES = ("rmse", "mae", "r2_test", "r2_oos", "directional_accuracy", "qlike")
 
 
-def regression_metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float]:
+def regression_metrics(
+    actual: np.ndarray,
+    predicted: np.ndarray,
+    target: str = "return",
+    benchmark: np.ndarray | None = None,
+) -> dict[str, float]:
     """Tính metric hồi quy sau khi kiểm tra kích thước và giá trị hữu hạn."""
     actual = np.asarray(actual, dtype=float)
     predicted = np.asarray(predicted, dtype=float)
@@ -28,12 +33,36 @@ def regression_metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, f
         raise ValueError("actual và predicted phải là hai vector một chiều cùng kích thước.")
     if len(actual) < 2 or not np.isfinite(actual).all() or not np.isfinite(predicted).all():
         raise ValueError("Dự báo cần ít nhất hai giá trị hữu hạn.")
-    return {
+    result: dict[str, float] = {
         "rmse": float(mean_squared_error(actual, predicted) ** 0.5),
         "mae": float(mean_absolute_error(actual, predicted)),
-        "r2": float(r2_score(actual, predicted)),
-        "directional_accuracy": float((np.sign(actual) == np.sign(predicted)).mean()),
+        "r2_test": float(r2_score(actual, predicted)),
     }
+    if benchmark is None:
+        result["r2_oos"] = float("nan")
+    else:
+        benchmark = np.asarray(benchmark, dtype=float)
+        if benchmark.shape != actual.shape or not np.isfinite(benchmark).all():
+            raise ValueError("benchmark phải là vector hữu hạn cùng kích thước actual.")
+        denominator = float(np.sum((actual - benchmark) ** 2))
+        result["r2_oos"] = (
+            float(1.0 - np.sum((actual - predicted) ** 2) / denominator)
+            if denominator > 0
+            else float("nan")
+        )
+    if target == "return":
+        result["directional_accuracy"] = float((np.sign(actual) == np.sign(predicted)).mean())
+        result["qlike"] = float("nan")
+    elif target == "volatility":
+        epsilon = np.finfo(float).eps
+        actual_variance = np.maximum(actual, epsilon) ** 2
+        predicted_variance = np.maximum(predicted, epsilon) ** 2
+        ratio = actual_variance / predicted_variance
+        result["directional_accuracy"] = float("nan")
+        result["qlike"] = float(np.mean(ratio - np.log(ratio) - 1.0))
+    else:
+        raise ValueError("target phải là 'return' hoặc 'volatility'.")
+    return result
 
 
 def reset_generated_results() -> None:
@@ -41,8 +70,6 @@ def reset_generated_results() -> None:
     for filename in (
         "metrics.csv",
         "predictions.csv",
-        "group_summary.csv",
-        "per_ticker_summary.csv",
         "statistical_tests.csv",
         "BAO_CAO_KET_QUA.md",
         "BANG_KET_QUA_CHI_TIET_VI.csv",
@@ -54,6 +81,9 @@ def reset_generated_results() -> None:
         path = RESULTS_DIR / filename
         if path.exists():
             path.unlink()
+    for pattern in ("group_summary_*.csv", "per_ticker_summary_*.csv"):
+        for path in RESULTS_DIR.glob(pattern):
+            path.unlink()
     for directory in (PER_TICKER_PLOTS_DIR, GROUP_PLOTS_DIR):
         if directory.exists():
             shutil.rmtree(directory)
@@ -64,7 +94,7 @@ def _upsert_csv(path: Path, new_rows: pd.DataFrame, keys: list[str]) -> None:
     if path.exists():
         old_rows = pd.read_csv(path)
         if not set(keys).issubset(old_rows.columns):
-            raise ValueError(f"{path} không cùng schema; hãy chạy lại với --reset-results.")
+            raise ValueError(f"{path} không cùng schema; hãy chạy lại không dùng --keep-results.")
         markers = old_rows.merge(new_rows.loc[:, keys].drop_duplicates(), on=keys, how="left", indicator=True)["_merge"]
         new_rows = pd.concat([old_rows.loc[markers.eq("left_only")], new_rows], ignore_index=True)
     new_rows.to_csv(path, index=False)
@@ -74,8 +104,12 @@ def save_experiment_outputs(
     *,
     model: str,
     ticker: str,
+    target: str,
+    horizon: int,
     window: int,
     feature_set: str,
+    news_cutoff_hour: int,
+    tail_weight: float,
     seed: int,
     parameter_count: int,
     dates: np.ndarray,
@@ -88,8 +122,12 @@ def save_experiment_outputs(
     identity = {
         "model": model,
         "ticker": ticker,
+        "target": target,
+        "horizon": horizon,
         "window": window,
         "feature_set": feature_set,
+        "news_cutoff_hour": news_cutoff_hour,
+        "tail_weight": tail_weight,
         "seed": seed,
         "parameter_count": parameter_count,
     }
@@ -98,47 +136,80 @@ def save_experiment_outputs(
         {
             **identity,
             "date": pd.to_datetime(dates).strftime("%Y-%m-%d"),
-            "actual_return": actual,
-            "predicted_return": predicted,
+            "actual_value": actual,
+            "predicted_value": predicted,
         }
     )
     _upsert_csv(RESULTS_DIR / "predictions.csv", predictions, [*identity, "date"])
 
 
-def plot_learning_curve(model: str, ticker: str, seed: int, train_loss: list[float], valid_loss: list[float]) -> None:
+def plot_learning_curve(
+    model: str,
+    ticker: str,
+    target: str,
+    horizon: int,
+    window: int,
+    feature_set: str,
+    news_cutoff_hour: int,
+    tail_weight: float,
+    seed: int,
+    train_loss: list[float],
+    valid_loss: list[float],
+) -> None:
     if not train_loss:
         return
     PER_TICKER_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     figure, axis = plt.subplots(figsize=(8, 4))
     axis.plot(train_loss, label="Huấn luyện")
     axis.plot(valid_loss, label="Xác thực")
-    axis.set(title=f"MSE theo epoch - {model}, {ticker}, seed {seed}", xlabel="Epoch", ylabel="MSE")
+    axis.set(title=f"Loss - {target}, {model}, {feature_set}, {ticker}, seed {seed}", xlabel="Epoch", ylabel="MSE có trọng số")
     axis.legend()
     figure.tight_layout()
-    figure.savefig(PER_TICKER_PLOTS_DIR / f"loss_{ticker}_{model}_seed_{seed}.png", dpi=160)
+    suffix = f"{target}_h{horizon}_w{window}_{ticker}_{model}_{feature_set}_c{news_cutoff_hour}_tw{tail_weight:g}_seed_{seed}"
+    figure.savefig(PER_TICKER_PLOTS_DIR / f"loss_{suffix}.png", dpi=160)
     plt.close(figure)
 
 
 def plot_actual_vs_predicted(
-    model: str, ticker: str, seed: int, dates: np.ndarray, actual: np.ndarray, predicted: np.ndarray
+    model: str,
+    ticker: str,
+    target: str,
+    horizon: int,
+    window: int,
+    feature_set: str,
+    news_cutoff_hour: int,
+    tail_weight: float,
+    seed: int,
+    dates: np.ndarray,
+    actual: np.ndarray,
+    predicted: np.ndarray,
 ) -> None:
     PER_TICKER_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     figure, axis = plt.subplots(figsize=(11, 4))
-    axis.plot(dates, actual, label="Log return thực tế", linewidth=1)
-    axis.plot(dates, predicted, label="Log return dự báo", linewidth=1)
-    axis.set(title=f"Dự báo và thực tế - {model}, {ticker}, seed {seed}", xlabel="Ngày mục tiêu", ylabel="Log return")
+    label = "Log-return" if target == "return" else "Độ biến động thực hiện"
+    axis.plot(dates, actual, label=f"{label} thực tế", linewidth=1)
+    axis.plot(dates, predicted, label=f"{label} dự báo", linewidth=1)
+    axis.set(title=f"{target} - {model}, {feature_set}, {ticker}, seed {seed}", xlabel="Ngày cuối kỳ mục tiêu", ylabel=label)
     axis.legend()
     figure.autofmt_xdate()
     figure.tight_layout()
-    figure.savefig(PER_TICKER_PLOTS_DIR / f"actual_vs_predicted_{ticker}_{model}_seed_{seed}.png", dpi=160)
+    suffix = f"{target}_h{horizon}_w{window}_{ticker}_{model}_{feature_set}_c{news_cutoff_hour}_tw{tail_weight:g}_seed_{seed}"
+    figure.savefig(PER_TICKER_PLOTS_DIR / f"actual_vs_predicted_{suffix}.png", dpi=160)
     plt.close(figure)
 
 
-def per_ticker_summary(window: int) -> pd.DataFrame:
+def per_ticker_summary(window: int, target: str, horizon: int) -> pd.DataFrame:
     """Gộp các seed trước khi so sánh mô hình theo từng mã cổ phiếu."""
     metrics = pd.read_csv(RESULTS_DIR / "metrics.csv")
-    metrics = metrics.loc[metrics["window"] == window].copy()
-    grouped = metrics.groupby(["model", "ticker", "window", "feature_set"], as_index=False)
+    metrics = metrics.loc[
+        metrics["window"].eq(window)
+        & metrics["target"].eq(target)
+        & metrics["horizon"].eq(horizon)
+    ].copy()
+    grouped = metrics.groupby(
+        ["model", "ticker", "target", "horizon", "window", "feature_set", "news_cutoff_hour", "tail_weight"],
+        as_index=False,
+    )
     result = grouped.agg(
         seed_count=("seed", "nunique"),
         parameter_count=("parameter_count", "max"),
@@ -152,11 +223,15 @@ def per_ticker_summary(window: int) -> pd.DataFrame:
     return result
 
 
-def save_group_summary(window: int) -> pd.DataFrame:
+def save_group_summary(window: int, target: str, horizon: int) -> pd.DataFrame:
     """Tổng hợp trung bình theo mã sau khi đã trung bình qua các seed."""
-    per_ticker = per_ticker_summary(window)
-    per_ticker.to_csv(RESULTS_DIR / "per_ticker_summary.csv", index=False)
-    grouped = per_ticker.groupby(["model", "window", "feature_set"], as_index=False)
+    per_ticker = per_ticker_summary(window, target, horizon)
+    per_ticker_path = RESULTS_DIR / f"per_ticker_summary_{target}_h{horizon}_w{window}.csv"
+    per_ticker.to_csv(per_ticker_path, index=False)
+    grouped = per_ticker.groupby(
+        ["model", "target", "horizon", "window", "feature_set", "news_cutoff_hour", "tail_weight"],
+        as_index=False,
+    )
     summary = grouped.agg(
         tickers=("ticker", "nunique"),
         seed_count=("seed_count", "max"),
@@ -165,17 +240,23 @@ def save_group_summary(window: int) -> pd.DataFrame:
         **{f"{metric}_std_ticker": (f"{metric}_mean", "std") for metric in METRIC_NAMES},
         **{f"{metric}_std_seed_mean": (f"{metric}_std_seed", "mean") for metric in METRIC_NAMES},
     )
-    summary.to_csv(RESULTS_DIR / "group_summary.csv", index=False)
+    for metric in METRIC_NAMES:
+        summary[f"{metric}_std_ticker"] = summary[f"{metric}_std_ticker"].fillna(0.0)
+    summary.to_csv(RESULTS_DIR / f"group_summary_{target}_h{horizon}_w{window}.csv", index=False)
     return summary
 
 
-def plot_group_metric_comparison(window: int) -> None:
-    summary = save_group_summary(window)
+def plot_group_metric_comparison(window: int, target: str, horizon: int) -> None:
+    summary = save_group_summary(window, target, horizon)
     GROUP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    for metric, title in (("rmse", "RMSE trung bình"), ("mae", "MAE trung bình"), ("directional_accuracy", "Độ chính xác hướng trung bình")):
+    target_metrics = (("rmse", "RMSE trung bình"), ("mae", "MAE trung bình"))
+    target_metrics += (("directional_accuracy", "Độ chính xác hướng trung bình"),) if target == "return" else (("qlike", "QLIKE trung bình"),)
+    for metric, title in target_metrics:
         figure, axis = plt.subplots(figsize=(9, 4))
-        axis.bar(summary["model"], summary[f"{metric}_mean"], yerr=summary[f"{metric}_std_ticker"], capsize=4)
-        axis.set(title=f"{title} theo mô hình", xlabel="Mô hình", ylabel=metric)
+        labels = summary["model"] + "\n" + summary["feature_set"]
+        axis.bar(labels, summary[f"{metric}_mean"], yerr=summary[f"{metric}_std_ticker"], capsize=4)
+        axis.set(title=f"{title} - {target}", xlabel="Mô hình / tập đặc trưng", ylabel=metric)
+        axis.tick_params(axis="x", labelrotation=20)
         figure.tight_layout()
-        figure.savefig(GROUP_PLOTS_DIR / f"group_{metric}_window_{window}.png", dpi=160)
+        figure.savefig(GROUP_PLOTS_DIR / f"group_{target}_{metric}_h{horizon}_w{window}.png", dpi=160)
         plt.close(figure)

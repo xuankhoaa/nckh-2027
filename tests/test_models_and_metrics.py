@@ -27,6 +27,21 @@ class ModelAndMetricTests(unittest.TestCase):
         self.assertEqual(metrics["mae"], 0.0)
         self.assertEqual(metrics["directional_accuracy"], 1.0)
 
+    def test_volatility_metrics_include_qlike(self) -> None:
+        actual = np.array([0.01, 0.02, 0.03])
+        metrics = regression_metrics(actual, actual.copy(), target="volatility")
+        self.assertEqual(metrics["rmse"], 0.0)
+        self.assertAlmostEqual(metrics["qlike"], 0.0)
+        self.assertTrue(np.isnan(metrics["directional_accuracy"]))
+
+    def test_oos_r2_uses_train_mean_benchmark(self) -> None:
+        actual = np.array([-0.02, 0.01, 0.03])
+        benchmark = np.full(3, 0.005)
+        baseline_metrics = regression_metrics(actual, benchmark, benchmark=benchmark)
+        perfect_metrics = regression_metrics(actual, actual, benchmark=benchmark)
+        self.assertAlmostEqual(baseline_metrics["r2_oos"], 0.0)
+        self.assertAlmostEqual(perfect_metrics["r2_oos"], 1.0)
+
     def test_parallel_scan_matches_sequential_recurrence(self) -> None:
         """Quét tiền tố phải giữ nguyên kết quả của h_t = a_t h_(t-1) + b_t."""
         torch.manual_seed(7)

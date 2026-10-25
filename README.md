@@ -1,205 +1,214 @@
-# NCKH 2027 — Dự báo tỷ suất sinh lợi cổ phiếu ngân hàng Việt Nam bằng Selective SSM
+# NCKH 2027 — Mamba đa biến cho cổ phiếu ngân hàng Việt Nam
 
-Kho mã nguồn này là pipeline nghiên cứu có thể tái lập để dự báo **log-return một phiên kế tiếp** của tám cổ phiếu ngân hàng Việt Nam. Dự án được xây dựng cho mục tiêu học thuật: kiểm tra liệu Selective State Space Model (Selective SSM) lấy cảm hứng từ Mamba có giảm sai số dự báo so với các baseline đơn giản và LSTM hay không.
+Đề tài nghiên cứu ảnh hưởng của dữ liệu thị trường và tâm lý tin tức tới hai bài toán:
 
-> Đây không phải công cụ tư vấn đầu tư, không dự báo giá đóng cửa và không tạo tín hiệu mua/bán.
+1. dự báo log-return cổ phiếu phiên kế tiếp;
+2. dự báo độ biến động thực hiện trong 5 phiên kế tiếp.
 
-## Tổng quan
+Đối tượng gồm `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB`. Đây là pipeline nghiên cứu có thể tái lập, không phải công cụ tư vấn đầu tư.
 
-| Hạng mục | Nội dung |
-|---|---|
-| Bài toán | Hồi quy tỷ suất sinh lợi (Bài toán 1) |
-| Mục tiêu | Dự báo $r_{t+1}=\ln(P_{t+1}/P_t)$ từ thông tin có đến cuối phiên $t$ |
-| Mã nghiên cứu | `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB` |
-| Dữ liệu | OHLCV ngày và return VN-Index, nguồn Vnstock/KBS |
-| Khoảng snapshot | 01/01/2020–12/10/2026; ngày giao dịch đầu tiên thực tế là 02/01/2020 |
-| Cửa sổ đầu vào | 30 phiên giao dịch |
-| Mô hình | 2 baseline, LSTM, Selective SSM cơ sở, Selective SSM có VN-Index |
-| Đánh giá | RMSE, MAE, $R^2$, Directional Accuracy và kiểm định HAC |
+## Trả lời ngắn cho câu hỏi “ablation hay chỉ so sánh mô hình?”
 
-Các bài toán dự báo độ biến động tương lai và phân loại rủi ro thấp/trung bình/cao **không nằm trong phạm vi hiện tại**. Chúng cần biến mục tiêu, thiết kế đánh giá và metric riêng; dự án không trình bày chúng như kết quả đã đạt được.
+Cần **cả hai**, vì chúng trả lời hai câu hỏi khác nhau:
 
-## Câu hỏi nghiên cứu
-
-1. Trên cùng dữ liệu, cửa sổ và giai đoạn kiểm tra, Selective SSM có dự báo log-return một phiên kế tiếp tốt hơn baseline và LSTM không?
-2. Bổ sung return VN-Index có giúp Selective SSM giảm sai số dự báo không?
-
-Các câu trả lời chỉ có giá trị trong phạm vi snapshot dữ liệu, feature, horizon và cấu hình đã công bố trong kho này.
-
-## Thiết kế nghiên cứu
-
-### Dữ liệu, feature và nhãn
-
-Mỗi phiên giao dịch cung cấp năm biến OHLCV: `open`, `high`, `low`, `close`, `volume`. Pipeline dẫn xuất ba feature của từng cổ phiếu là `return`, `volume_change`, `high_low_range`; biến thể thị trường chung bổ sung `vnindex_return`.
-
-Với giá đóng cửa $P_t$, khối lượng $V_t$, giá cao/thấp $H_t,L_t$ và giá đóng cửa VN-Index $I_t$:
-
-$$
-\begin{aligned}
-r_t &= \ln(P_t/P_{t-1}), \\
-v_t &= V_t/V_{t-1}-1, \\
-q_t &= (H_t-L_t)/P_t, \\
-r_t^{VN} &= \ln(I_t/I_{t-1}), \\
-y_t &= r_{t+1}.
-\end{aligned}
-$$
-
-Mỗi mẫu là cửa sổ $X_t=[x_{t-29},\ldots,x_t]$; nhãn là log-return của phiên $t+1$. Vì vậy, feature của tương lai không thể xuất hiện trong đầu vào.
-
-### Chia dữ liệu và chống rò rỉ
-
-Mẫu được gán tập theo **ngày của nhãn**, không chia ngẫu nhiên.
-
-| Tập | Ngày của nhãn | Mục đích |
+| Trục thí nghiệm | So sánh | Câu hỏi được trả lời |
 |---|---|---|
-| Train | Đến 31/12/2023 | Fit trọng số, feature scaler và target scaler |
-| Validation | 01/01/2024–31/12/2024 | Chọn epoch dừng sớm |
-| Test | Từ 01/01/2025 | Đánh giá cuối cùng |
+| Mô hình | LSTM với Selective SSM trên đúng cùng đầu vào | Kiến trúc nào tốt hơn? |
+| Dữ liệu/ablation | Market-only với Market+News trên đúng cùng mô hình | Tin tức có tạo thêm giá trị dự báo không? |
+| Thành phần tin | bỏ sentiment hoặc bỏ news count | Thành phần tin nào đóng góp? |
+| Baseline | mạng nơ-ron với Train Mean | Mô hình có vượt ngưỡng tối thiểu hay không? |
 
-`StandardScaler` chỉ được fit trên feature của train. Với mạng nơ-ron, target được chuẩn hóa bằng thống kê train khi tối ưu và được đảo chuẩn hóa trước khi tính metric. Cửa sổ test có thể dùng lịch sử quá khứ, nhưng không dùng feature hoặc nhãn sau ngày dự báo.
+Không thực hiện ablation embedding mã cổ phiếu ở thiết kế chính, vì mô hình hiện được huấn luyện riêng theo từng mã và không có ticker embedding. Chỉ nên kiểm tra thành phần này nếu chuyển sang một mô hình pooled/global dùng chung tám mã.
 
-### Mô hình so sánh
+## Thiết kế đã cài đặt
 
-| ID | Mô hình | Thiết lập chính | Vai trò |
-|---|---|---|---|
-| `naive_zero` | Baseline return bằng 0 | 0 tham số | Mốc “không thay đổi” |
-| `train_mean` | Baseline trung bình tập huấn luyện | 0 tham số | Mốc hằng chỉ dùng train |
-| `lstm` | LSTM | 1 lớp, hidden size 8, 585 tham số | Đối chứng mạng tuần tự |
-| `mamba_baseline` | Selective SSM cơ sở | 1 lớp, $d_{state}=8$, causal convolution kernel 3, 545 tham số | Đánh giá Selective SSM trên feature cổ phiếu |
-| `improved_mamba` | Selective SSM có VN-Index | Như trên, 553 tham số | Kiểm tra giá trị tăng thêm của thị trường chung |
+### Đầu vào
 
-`models/mamba_model.py` là hiện thực Selective SSM độc lập, tối giản theo ý tưởng Mamba: RMSNorm, chiếu đầu vào, causal depthwise convolution, tham số chọn lọc $\Delta,B,C$, cổng SiLU, residual connection và prefix scan affine. Test đơn vị xác nhận phép quét song song khớp truy hồi tuần tự.
+`Market-only` gồm OHLCV, log-return, thay đổi khối lượng, biên độ high–low, độ biến động lịch sử 5 phiên và return VN-Index.
 
-MambaStock chỉ được sử dụng làm tài liệu tham khảo học thuật. Kho này không fork, import hoặc chỉnh sửa tiếp mã nguồn MambaStock; vì vậy không nên gọi kết quả là bản tái lập nguyên xi MambaStock hoặc benchmark của thư viện `mamba_ssm` chính thức.
+`Market + News` bổ sung:
 
-### Thiết lập thực nghiệm
+- `sentiment_score`: trung bình điểm cảm xúc theo mã và phiên;
+- `news_count`: số bài theo mã và phiên.
 
-Mỗi mạng được chạy với năm seed `42, 52, 62, 72, 82`; hai baseline có tính xác định nên chỉ chạy seed `0`. Adam dùng learning rate `0.001`, tối đa 40 epoch, batch size 128 và early stopping patience 8 theo MSE validation.
+Hai ablation tùy chọn là `market_news_no_sentiment` và `market_news_no_count`. LSTM và Selective SSM luôn được chạy trên cùng tập feature để tránh đánh đồng ảnh hưởng của kiến trúc với ảnh hưởng của dữ liệu.
 
-Tổng số lượt chạy của bộ thực nghiệm đầy đủ là:
+### Hai biến mục tiêu
+
+Với giá đóng cửa $P_t$ và log-return $r_t=\ln(P_t/P_{t-1})$:
 
 $$
-8\ \text{mã}\times\left(2\ \text{baseline}+3\ \text{mạng}\times5\ \text{seed}\right)=136.
+y_t^{(return)}=r_{t+1},
 $$
 
-## Kết quả thực nghiệm
+$$
+y_t^{(vol)}=\sqrt{\frac{1}{H}\sum_{j=1}^{H}r_{t+j}^2},\qquad H=5.
+$$
 
-Lượt chạy đầy đủ trên snapshot đến 12/10/2026 đã hoàn thành 136 cấu hình. Bảng dưới là trung bình nhóm trên tám mã; RMSE và MAE càng nhỏ càng tốt.
+Mẫu volatility được gán tập theo ngày cuối của horizon, nên mọi return trong nhãn train đều kết thúc trước mốc train. Dự báo volatility âm được chặn về số dương rất nhỏ trước khi đánh giá.
 
-| Mô hình | RMSE | MAE | $R^2$ | DA |
-|---|---:|---:|---:|---:|
-| Baseline return bằng 0 | 0,018928 | 0,012859 | -0,001364 | 0,078588 |
-| Baseline trung bình tập huấn luyện | **0,018918** | 0,012899 | -0,000482 | 0,462415 |
-| LSTM | 0,019195 | 0,013171 | -0,030056 | 0,459055 |
-| Selective SSM cơ sở | 0,019145 | 0,013180 | -0,024805 | 0,459510 |
-| Selective SSM có VN-Index | 0,019156 | 0,013211 | -0,026057 | 0,461048 |
+### Chia dữ liệu
 
-Kết quả cần được diễn giải thận trọng: baseline trung bình tập huấn luyện có RMSE thấp nhất. Trong các mạng, Selective SSM cơ sở tốt nhất, nhưng RMSE vẫn cao hơn baseline `0,000227`. Do đó, nghiên cứu **chưa có bằng chứng** rằng Selective SSM giảm sai số trung bình nhóm ở cấu hình hiện tại; thêm return VN-Index cũng chưa cải thiện RMSE. Đây là kết quả âm được giữ lại và báo cáo minh bạch.
+| Tập | Ngày của nhãn | Vai trò |
+|---|---|---|
+| Train | đến 31/12/2023 | fit scaler, trọng số và ngưỡng tail-loss |
+| Validation | 01/01/2024–31/12/2024 | early stopping |
+| Test | từ 01/01/2025 | đánh giá cuối |
 
-Phân tích theo từng mã, độ lệch chuẩn theo seed, kiểm định HAC, bảng dự báo theo ngày và diễn giải học thuật có trong [báo cáo NCKH đầy đủ](bao_cao/BAO_CAO_NCKH.md).
+Feature scaler và target scaler chỉ fit trên train. Cửa sổ không bị shuffle và target luôn nằm sau ngày cuối của input.
 
-## Tái lập kết quả
+### Mô hình và metric
 
-### 1. Chuẩn bị môi trường
+- Baseline: `train_mean` cho cả hai bài toán; `naive_zero` chỉ dùng cho return.
+- Đối chứng: LSTM.
+- Mô hình nghiên cứu: Selective SSM tối giản lấy cảm hứng từ Mamba.
+- Return: RMSE, MAE, $R^2_{OOS}$ và Directional Accuracy.
+- Volatility: RMSE, MAE, $R^2_{OOS}$ và QLIKE.
+- Mỗi mạng chạy mặc định 5 seed; báo cáo mean và độ lệch chuẩn theo seed, từng mã và toàn nhóm.
+- Kiểm định HAC so sánh squared loss của mỗi mạng với Train Mean trên cùng ngày test.
 
-Yêu cầu Python 3.10 trở lên. Lệnh kiểm tra trong kho đã được chạy với Python 3.13.
+## Trạng thái dữ liệu và kết quả
+
+Ma trận chính đã hoàn thành **344 lượt chạy** và 151.016 dự báo trên snapshot
+14.090 tiêu đề tin. Kết quả trung bình tám mã:
+
+| Bài toán | Mô hình | RMSE | MAE | R² OOS | Metric riêng |
+|---|---|---:|---:|---:|---:|
+| Return | Train Mean | **0,018918** | **0,012904** | 0,000000 | DA 0,462415 |
+| Return | Mamba-style, Market-only | 0,019081 | 0,013147 | -0,017150 | DA 0,456720 |
+| Return | Mamba-style, Market+News | 0,019127 | 0,013184 | -0,022165 | DA 0,459226 |
+| Return | LSTM, Market-only | 0,019319 | 0,013368 | -0,044754 | DA 0,463895 |
+| Return | LSTM, Market+News | 0,019228 | 0,013224 | -0,032925 | DA 0,455752 |
+| Volatility | Train Mean | 0,010576 | 0,008696 | 0,000000 | QLIKE 0,692187 |
+| Volatility | Mamba-style, Market-only | **0,009779** | 0,007554 | **0,142239** | **QLIKE 0,683595** |
+| Volatility | Mamba-style, Market+News | 0,009905 | 0,007624 | 0,118645 | QLIKE 0,761999 |
+| Volatility | LSTM, Market-only | 0,009871 | **0,007530** | 0,125247 | QLIKE 0,728266 |
+| Volatility | LSTM, Market+News | 0,010110 | 0,007536 | 0,079817 | QLIKE 0,834817 |
+
+Return vẫn là kết quả âm: mọi cấu hình mạng đều chưa vượt Train Mean theo RMSE
+và $R^2_{OOS}$ vẫn âm. News giúp RMSE của LSTM giảm nhẹ nhưng chỉ tốt hơn
+Market-only ở 16/40 cặp mã–seed; Mamba+News kém Mamba Market-only trung bình.
+
+Với volatility, cấu hình tốt nhất vẫn là Mamba Market-only. Market+News làm RMSE
+trung bình xấu đi ở cả LSTM và Mamba; số cặp news tốt hơn lần lượt chỉ là 14/40
+và 18/40. Vì vậy snapshot và sentiment baseline hiện tại **chưa cho bằng chứng
+ổn định rằng tin tức tạo giá trị dự báo tăng thêm**. Đây là kết quả nghiên cứu
+hợp lệ, đồng thời chỉ ra bước tiếp theo là kiểm định/gia cố bộ chấm sentiment,
+không phải loại bỏ Train Mean hay chọn riêng seed thuận lợi.
+
+Dự án đã có `collect_news.py` để tạo snapshot tin lịch sử theo từng ngân hàng
+từ Google News RSS. Chỉ metadata, tiêu đề, nguồn, URL và thời gian được lưu;
+không sao chép toàn văn. Tiêu đề phải nhắc trực tiếp đúng ngân hàng, dữ liệu
+được loại trùng và phải đạt độ phủ tối thiểu trong cả train/validation/test.
+
+Sentiment hiện là một **NLP baseline từ điển tài chính tiếng Việt**, chấm trên
+tiêu đề theo cùng một quy tắc cho toàn kỳ. Đây là lựa chọn minh bạch và vừa sức
+cho NCKH đại học, nhưng không được gọi là nhãn cảm xúc chuẩn. Trước khi chốt bài
+báo, nhóm cần gán nhãn thủ công mẫu do script sinh ra và báo cáo Accuracy/F1.
+
+## Môi trường
+
+Dự án đang dùng dòng **Vnstock 4.x** (`vnstock 4.0.8`, `vnai 2.6.0`) và API `Quote` trong `get_data.py`. Không nâng cấp chồng Vnstock 5.x vào cùng môi trường.
+
+Môi trường đã dùng để tạo kết quả nằm tại `%USERPROFILE%\.venv`. Khi thiết lập
+trên máy mới, kiểm tra môi trường trước và không cài Vnstock 5.x chồng lên dòng
+4.x. Các lệnh dưới đây luôn gọi đúng Python của môi trường này:
 
 ```powershell
-git clone https://github.com/xuankhoaa/nckh-2027.git
-cd nckh-2027
-py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip show vnstock vnstock_data vnai
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
 ```
 
-`get_data.py` dùng API `Quote` của dòng Vnstock 4.x, và `requirements.txt` đã khóa `vnstock<5`. Hãy giữ môi trường `.venv` này riêng cho dự án; không nâng cấp chồng Vnstock 5.x vào môi trường đó.
+API key chỉ được lưu cục bộ theo hướng dẫn Vnstock, không ghi vào mã, lệnh, báo cáo hay cuộc trò chuyện.
 
-### 2. Chuẩn bị dữ liệu
+## Chạy nghiên cứu
 
-Thư mục `data/` được Git bỏ qua vì chứa snapshot tái tạo được. Nếu checkout của bạn đã có các CSV cache đúng snapshot, có thể chuyển thẳng sang bước 3. Nếu chưa có, tạo tệp `.env` từ mẫu, điền khóa API của bạn tại máy cục bộ và tải dữ liệu:
+Tải/cache dữ liệu thị trường nếu cần:
 
 ```powershell
-Copy-Item .env.example .env
-.\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
+& "$env:USERPROFILE\.venv\Scripts\python.exe" get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
 ```
 
-Không đưa `VNSTOCK_API_KEY` vào mã nguồn, notebook, commit hoặc cuộc trò chuyện. `get_data.py` luôn bổ sung `VNINDEX`, tái sử dụng CSV đã cache theo mặc định và chỉ ghi đè khi có cờ `--force`.
-
-Sau bước dữ liệu, `data/DATA_MANIFEST.json` lưu số dòng, khoảng ngày, SHA-256 và cảnh báo chất lượng. Snapshot hiện hành có 9 tệp OHLCV; có cảnh báo nguồn cho 3 dòng VN-Index có `close` ngoài khoảng `[low, high]`. Pipeline chỉ dùng `close` để tính `vnindex_return` và không tự sửa dữ liệu nguồn.
-
-### 3. Chạy thí nghiệm và sinh báo cáo
+Thu thập snapshot tin, chấm sentiment và kiểm tra độ phủ:
 
 ```powershell
-.\.venv\Scripts\python.exe run_experiments.py
-.\.venv\Scripts\python.exe generate_report.py --window 30
-.\.venv\Scripts\python.exe verify_project.py --require-results
+& "$env:USERPROFILE\.venv\Scripts\python.exe" collect_news.py
 ```
 
-`run_experiments.py` xóa đúng các output tái tạo được trước một lượt chạy mới. Chỉ dùng `--keep-results` khi chủ ý tiếp tục một bộ kết quả đang có cùng schema.
-
-### 4. Kiểm tra trước khi nộp
+Mở `data/news_validation_sample.csv`, điền `human_label` bằng một trong ba giá
+trị `negative`, `neutral`, `positive`, sau đó kiểm tra chất lượng:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe -m compileall -q .
-.\.venv\Scripts\python.exe verify_project.py --require-results
+& "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py
 ```
 
-`verify_project.py` kiểm tra sự hiện diện của mã cốt lõi, tính hợp lệ của dữ liệu cache, tính đầy đủ của 136 dòng metric và sự khớp giữa metric với dự báo.
+Thư mục `data/` không được commit. Giữ `data/NEWS_MANIFEST.json` cùng snapshot
+nội bộ khi tái lập thí nghiệm; trên GitHub chỉ công bố mã thu thập, schema và mô
+tả nguồn. Kết quả có thể thay đổi nếu chỉ mục Google News thay đổi, vì vậy ngày
+thu thập và checksum luôn được ghi vào manifest.
 
-## Đầu ra và tính tái lập
+Chạy mốc Market-only cho cả hai bài toán khi chưa có dữ liệu tin:
 
-Kết quả tái tạo được sinh trong `results/` và không được đưa vào Git. Những tệp chính gồm:
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_only
+```
 
-| Tệp | Nội dung |
-|---|---|
-| `EXPERIMENT_MANIFEST.json` | Commit Git, phiên bản môi trường, thiết bị, cấu hình và manifest dữ liệu |
-| `BANG_KET_QUA_CHI_TIET_VI.csv` | 136 metric theo mã, mô hình và seed; cột tiếng Việt |
-| `BANG_TONG_HOP_NHOM_VI.csv` | Trung bình/độ lệch chuẩn theo mã và seed |
-| `DU_BAO_THEO_NGAY_VI.csv` | Giá trị thực và dự báo log-return theo ngày test |
-| `KIEM_DINH_HAC_VI.csv` | So sánh squared loss của mạng với baseline return bằng 0 |
-| `BAO_CAO_KET_QUA.md` | Tóm tắt tự động từ các CSV |
-| `bieu_do/` | Learning curve, thực tế–dự báo và biểu đồ metric nhóm |
+Sau khi chuẩn bị `data/news.csv`, chạy ma trận chính Market-only và Market+News:
 
-Manifest giữ mã SHA-256 của dữ liệu cùng commit mã nguồn, nhờ đó một lượt chạy có thể xác định được chính xác đầu vào và môi trường đã dùng.
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py
+```
 
-## Cấu trúc kho mã
+Chạy thêm ablation sentiment/count:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --include-ablations
+```
+
+Độ nhạy là thí nghiệm bổ sung, nên đăng ký trước một lưới nhỏ thay vì thử đến khi có kết quả đẹp:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --include-ablations --windows 20 30 60 --tail-weights 1 2 --news-cutoff-hours 14 15 16
+```
+
+Sinh báo cáo và xác minh:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" generate_report.py --window 30
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m unittest discover -s tests -v
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m compileall -q .
+& "$env:USERPROFILE\.venv\Scripts\python.exe" verify_project.py --require-results
+```
+
+## Đầu ra
+
+Mỗi kết quả mang đủ định danh `target`, `horizon`, `window`, `feature_set`, `news_cutoff_hour`, `tail_weight`, `ticker`, `model`, `seed`. Các tệp chính:
+
+- `results/metrics.csv`: metric từng lần chạy;
+- `results/predictions.csv`: dự báo từng ngày;
+- `results/per_ticker_summary_*.csv`: mean/độ lệch chuẩn seed theo mã;
+- `results/group_summary_*.csv`: tổng hợp toàn nhóm;
+- `results/KIEM_DINH_HAC_VI.csv`: kiểm định so với Train Mean;
+- `results/KIEM_DINH_GIA_TRI_TIN_TUC_VI.csv`: kiểm định ghép cặp News với Market-only;
+- `results/BAO_CAO_KET_QUA.md`: diễn giải tự sinh;
+- `results/EXPERIMENT_MANIFEST.json`: commit, checksum, môi trường và cấu hình.
+
+## Cấu trúc chính
 
 ```text
-.
-├── config.py                 # Snapshot dữ liệu, ticker, split, window, seed
-├── get_data.py               # Tải/cache OHLCV và lập manifest dữ liệu
-├── data_quality.py           # Xác thực schema, OHLCV và SHA-256
-├── preprocess.py             # Feature, target, scaler và cửa sổ thời gian
-├── baselines.py              # Hai baseline hằng
-├── train.py                  # Huấn luyện một cấu hình
-├── run_experiments.py        # Điều phối toàn bộ 136 lượt chạy
-├── evaluate.py               # Metric, CSV và biểu đồ
-├── generate_report.py        # Sinh báo cáo/bảng tiếng Việt
-├── provenance.py             # Dấu vết môi trường và cấu hình thực nghiệm
-├── verify_project.py         # Xác minh tính toàn vẹn của dự án
-├── models/                   # LSTM và Selective SSM
-├── tests/                    # Test dữ liệu, leakage, scan và metric
-└── bao_cao/                  # Báo cáo Markdown dùng để soạn báo cáo chính thức
+config.py                 cấu hình target, feature set, ticker và split
+collect_news.py           tải metadata RSS, lọc thực thể và chấm sentiment baseline
+evaluate_sentiment.py     đánh giá mẫu sentiment do nhóm gán nhãn thủ công
+preprocess.py             đồng bộ market/news, tạo target và cửa sổ chống leakage
+train.py                  baseline, LSTM, Selective SSM và tail-weighted loss
+run_experiments.py        ma trận chính, ablation và sensitivity
+evaluate.py               metric, bảng tổng hợp và biểu đồ
+generate_report.py        bảng tiếng Việt, kiểm định HAC và báo cáo
+verify_project.py         kiểm tra schema và số lượt chạy theo manifest
+NEWS_DATA_SCHEMA.md       chuẩn dữ liệu tin tức
+tests/                    kiểm tra target, leakage, cutoff tin, model và metric
 ```
 
-## Giới hạn
+## Diễn giải khoa học
 
-- Dự án chỉ sử dụng OHLCV và return VN-Index; chưa sử dụng tin tức, sentiment, yếu tố vĩ mô hoặc dữ liệu cơ bản doanh nghiệp.
-- Dự báo là one-day-ahead return, chưa có transaction cost, chiến lược giao dịch hoặc backtest lợi nhuận.
-- Test hiện là một giai đoạn hậu 01/01/2025; kết quả chưa thay thế walk-forward validation nhiều cửa sổ.
-- Bài toán biến động và phân loại rủi ro cần được thiết kế thành các nghiên cứu tiếp theo, không suy ra trực tiếp từ kết quả hồi quy return này.
-
-## Tài liệu dự án
-
-- [Báo cáo NCKH đầy đủ](bao_cao/BAO_CAO_NCKH.md): diễn giải phương pháp, kết quả, kiểm định và giới hạn.
-- [Hướng dẫn vận hành A–Z](HUONG_DAN_A_Z.md): đầu vào, đầu ra và quy trình chạy chi tiết.
-- [Công thức và thuật toán](CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md): ký hiệu, công thức, Selective SSM và metric.
-- [Ghi chú bên thứ ba](THIRD_PARTY_NOTICES.md): phạm vi sử dụng các tài liệu/mã tham khảo.
-
-## Tài liệu tham khảo
-
-1. Gu, A., & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752. https://arxiv.org/abs/2312.00752
-2. Shi, Z. (2024). *MambaStock: Selective State Space Model for Stock Prediction*. arXiv:2402.18959. https://arxiv.org/abs/2402.18959
-3. Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory*. *Neural Computation*, 9(8), 1735–1780. https://doi.org/10.1162/neco.1997.9.8
-4. Hyndman, R. J., & Athanasopoulos, G. (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts. https://otexts.com/fpp3/
-5. Newey, W. K., & West, K. D. (1987). A Simple, Positive Semi-definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. *Econometrica*, 55(3), 703–708. https://doi.org/10.2307/1913610
+Train Mean là baseline bắt buộc nhưng không phải tiêu chuẩn duy nhất. Một tuyên bố “Mamba tốt hơn” chỉ có cơ sở khi Mamba giảm sai số so với Train Mean và LSTM, kết quả ổn định qua seed/mã, và chênh lệch loss có bằng chứng thống kê hợp lý. Tương tự, chỉ được kết luận “tin tức có ích” khi cùng một kiến trúc với Market+News tốt hơn chính nó ở Market-only; việc so Mamba+News với LSTM Market-only không tách được nguyên nhân cải thiện.

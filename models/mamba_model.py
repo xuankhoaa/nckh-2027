@@ -1,4 +1,4 @@
-"""Selective State Space Model dùng cho hồi quy return một phiên kế tiếp.
+"""Selective State Space Model dùng chung cho hồi quy return và volatility.
 
 Triển khai này được viết riêng cho đề tài từ mô tả trong bài báo Mamba của Gu và
 Dao (2023), không sao chép mã từ MambaStock. Phần quét trạng thái dùng phép
@@ -139,7 +139,7 @@ class ResidualSelectiveSSM(nn.Module):
 
 
 class MambaRegressor(nn.Module):
-    """Hồi quy next-day log return từ trạng thái cuối của chuỗi Selective SSM."""
+    """Hồi quy một target từ trạng thái cuối của chuỗi Selective SSM."""
 
     def __init__(
         self,

@@ -1,105 +1,121 @@
-# Báo cáo NCKH dự báo tỷ suất sinh lợi cổ phiếu ngân hàng Việt Nam bằng Selective State Space Model
+# Bản thảo báo cáo NCKH
 
-## Tóm tắt
+## Tên đề tài
 
-Nghiên cứu đánh giá khả năng dự báo log-return một phiên kế tiếp cho tám cổ phiếu ngân hàng Việt Nam từ dữ liệu OHLCV hằng ngày và return VN-Index. Dữ liệu snapshot đến 2026-10-12 được chia theo thời gian thành train, validation và test để bảo vệ tính nhân quả của dự báo. Thiết kế so sánh hai baseline hằng, LSTM, Selective SSM cơ sở và Selective SSM bổ sung return VN-Index; mỗi mạng được lặp trên năm seed. Kết quả trung bình nhóm cho thấy baseline trung bình train có RMSE thấp nhất (0.018918). Mạng tốt nhất là Selective SSM cơ sở với RMSE 0.019145, cao hơn baseline 0.000227. Vì vậy, nghiên cứu không khẳng định Selective SSM vượt baseline ở cấu hình hiện tại; kết quả âm này được báo cáo như một phát hiện cần thiết thay vì bị loại bỏ. Toàn bộ dự báo, metric, SHA-256 dữ liệu và cấu hình môi trường được lưu để tái lập.
+**Ứng dụng mô hình Mamba đa biến trên dữ liệu đa nguồn từ thị trường và tâm lý tin tức trong dự báo tỷ suất sinh lợi và độ biến động cổ phiếu ngành ngân hàng Việt Nam**
 
-**Từ khóa:** dự báo tỷ suất sinh lợi; cổ phiếu ngân hàng; Selective State Space Model; Mamba; LSTM; thị trường chứng khoán Việt Nam.
+## 1. Bối cảnh
 
-## 1. Vấn đề nghiên cứu và phạm vi
+Tỷ suất sinh lợi ngắn hạn có nhiễu lớn và phụ thuộc vào thông tin mới, trong khi độ biến động có tính dai dẳng nhưng thay đổi theo trạng thái thị trường. Dữ liệu OHLCV mô tả diễn biến giao dịch đã xảy ra; tin tức có thể bổ sung tín hiệu về kỳ vọng và tâm lý chưa phản ánh đầy đủ trong lịch sử giá. Nghiên cứu vì vậy không chỉ hỏi kiến trúc Mamba có tốt hơn LSTM hay không, mà còn hỏi kênh tin tức có tạo giá trị dự báo tăng thêm hay không.
 
-### 1.1. Bài toán cần giải quyết
+## 2. Mục tiêu và câu hỏi nghiên cứu
 
-Mục tiêu là dự báo một đại lượng liên tục: `log(close_(t+1) / close_t)`. Đây là Bài toán 1 — hồi quy tỷ suất sinh lợi, không phải dự báo giá đóng cửa. Dùng log-return thay vì giá có hai lý do: giá các mã có thang đo khác nhau, còn return biểu diễn biến động tương đối; đồng thời các log-return có thể cộng dồn theo thời gian. Dự báo horizon một phiên phù hợp với câu hỏi ngắn hạn, nhưng cũng là trường hợp rất nhiễu vì thông tin mới phát sinh sau thời điểm t chưa có trong feature.
+Nghiên cứu giải quyết hai bài toán:
 
-Nghiên cứu trả lời hai câu hỏi: (i) Selective SSM có giảm sai số dự báo so với hai baseline và LSTM trên cùng dữ liệu không; (ii) thêm return VN-Index có giúp Selective SSM không. Câu trả lời chỉ áp dụng cho snapshot, feature, horizon và siêu tham số được công bố.
+1. dự báo log-return cổ phiếu ở phiên kế tiếp;
+2. dự báo độ biến động thực hiện trong 5 phiên kế tiếp.
 
-### 1.2. Những gì không thuộc phạm vi
+Câu hỏi nghiên cứu:
 
-Nghiên cứu không đưa ra khuyến nghị mua/bán, không backtest chiến lược hay tính chi phí giao dịch. Nó chưa tạo target độ biến động tương lai cho Bài toán 2 và chưa tạo nhãn rủi ro thấp/trung bình/cao để làm Bài toán 3. Các bài toán đó cần target, metric và thiết kế đánh giá riêng; không được gộp lẫn với hồi quy return.
+- Trên cùng dữ liệu đầu vào, Selective SSM lấy cảm hứng từ Mamba có giảm sai số so với LSTM và Train Mean không?
+- Trên cùng kiến trúc, Market+News có tốt hơn Market-only không?
+- Điểm sentiment và số lượng tin đóng góp như thế nào?
+- Kết quả có ổn định theo mã cổ phiếu và seed hay không?
 
-## 2. Dữ liệu và lý do chọn feature
+## 3. Dữ liệu
 
-### 2.1. Dữ liệu
+Mẫu gồm tám cổ phiếu ngân hàng `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB`, cùng VN-Index. Snapshot thị trường hiện có từ 02/01/2020 đến 12/10/2026.
 
-Tám mã VCB, BID, CTG, MBB, TCB, ACB, VPB và STB được chọn để giữ cùng bối cảnh ngành ngân hàng nhưng vẫn có khác biệt về quy mô và thanh khoản. Đầu vào gốc gồm open, high, low, close và volume; VN-Index đại diện cho trạng thái thị trường chung. Các tệp dữ liệu được kiểm tra schema, trùng ngày, giá trị thiếu/không hữu hạn, điều kiện OHLC và khối lượng trước khi dùng.
+Nhóm feature thị trường gồm OHLCV, log-return, thay đổi khối lượng, biên độ high–low, realized volatility quá khứ 5 phiên và return VN-Index. Nhóm tin tức gồm sentiment trung bình và số bài theo mã/phiên. Metadata tin được truy hồi từ Google News RSS bằng tên thương hiệu của từng ngân hàng; chỉ lưu tiêu đề, nguồn, URL và thời điểm xuất bản, không lưu toàn văn. Bài chỉ được giữ khi tiêu đề nhắc trực tiếp đúng ngân hàng và được loại trùng theo URL hoặc tiêu đề–ngày.
 
-Không tự sửa dữ liệu nguồn. Manifest ghi SHA-256, số dòng và phạm vi từng CSV để người đọc có thể xác định đúng snapshot. Cảnh báo cần nêu rõ: VNINDEX: 3 dòng close nằm ngoài [low, high] từ nguồn dữ liệu; pipeline chỉ dùng close để tính vnindex_return và không tự sửa dữ liệu.
+Điểm sentiment là NLP baseline từ điển tài chính tiếng Việt trên tiêu đề, nhận giá trị trong $[-1,1]$. Phương pháp này có ưu điểm minh bạch và dễ tái lập nhưng không hiểu đầy đủ ngữ cảnh, phủ định hoặc mỉa mai. Vì vậy nghiên cứu phải báo cáo thêm kiểm tra thủ công trên mẫu phân tầng ba nhãn; không được mô tả điểm tự động là “nhãn thật”. Manifest tin lưu truy vấn, ngày thu thập, độ phủ và checksum snapshot.
 
-### 2.2. Feature dẫn xuất
+Quy tắc thông tin: tin trước 15:00 có thể dùng cho dự báo được lập sau phiên đó; tin từ 15:00 trở đi và tin ngày nghỉ được chuyển sang phiên giao dịch kế tiếp. Phân tích độ nhạy có thể dùng cutoff 14:00, 15:00 và 16:00.
 
-Từ mỗi phiên t, pipeline dùng log-return cổ phiếu, thay đổi tương đối khối lượng và biên độ high-low đã chuẩn hóa. Những feature này lần lượt mô tả biến động đóng cửa, thay đổi thanh khoản và mức dao động trong phiên. Return VN-Index được thêm riêng ở biến thể cải tiến để kiểm tra giả thuyết rằng thị trường chung mang thêm thông tin cho cổ phiếu ngân hàng.
+## 4. Biến mục tiêu
 
-Cửa sổ 30 phiên tương đương xấp xỉ một tháng rưỡi giao dịch. Đây là lựa chọn cân bằng giữa việc giữ bối cảnh gần và việc không làm số mẫu hữu ích giảm quá nhiều; nó được khóa trước khi chạy bộ thực nghiệm chính. Kết quả không chứng minh 30 là cửa sổ tối ưu tuyệt đối; window 60/90 cần là thí nghiệm tiếp theo được lập kế hoạch trước.
+Với $r_t=\ln(P_t/P_{t-1})$:
 
-## 3. Thiết kế dữ liệu để tránh rò rỉ tương lai
+$$
+y_t^{(r)}=r_{t+1}.
+$$
 
-Mỗi mẫu có 30 feature vector từ t-29 đến t và chỉ dự báo return ở t+1. Mẫu được gán tập theo **ngày của nhãn**, không theo ngày bắt đầu cửa sổ. Train kết thúc 31/12/2023, validation là năm 2024 và test bắt đầu 01/01/2025. Chia ngẫu nhiên sẽ trộn quan sát tương lai vào giai đoạn học, tạo kết quả quá lạc quan cho chuỗi thời gian.
+Với horizon $H=5$:
 
-StandardScaler chỉ fit trên feature train. Nhãn cũng được chuẩn hóa bằng trung bình và độ lệch chuẩn của train trước khi tối ưu rồi đảo chuẩn hóa trước đánh giá. Lý do là log-return có biên độ nhỏ; chuẩn hóa giúp gradient ổn định mà không dùng thông tin validation/test. Validation chỉ chọn epoch dừng sớm; test không tham gia chọn mô hình hoặc siêu tham số.
+$$
+y_t^{(\sigma)}=\sqrt{\frac{1}{H}\sum_{j=1}^{H}r_{t+j}^2}.
+$$
 
-## 4. Mô hình và lý do lựa chọn
+Đây là realized volatility chưa annualize. Ngày nhãn của bài toán volatility là ngày cuối trong 5 phiên tương lai; cách gán này ngăn một nhãn train đi qua ranh giới validation/test.
 
-### 4.1. Hai baseline là điều kiện bắt buộc
+## 5. Thiết kế thí nghiệm
 
-`naive_zero` dự báo return bằng 0 và `train_mean` dự báo trung bình return của train. Return ngày thường có trung bình gần 0, nên baseline đơn giản có thể rất mạnh. Nếu mạng không vượt baseline, không thể kết luận kiến trúc phức tạp hữu ích. Đặt baseline vào cùng tập test giúp kết quả có ý nghĩa hơn việc chỉ so sánh các mạng với nhau.
+### 5.1 Chia dữ liệu
 
-### 4.2. LSTM và Selective SSM
+- Train: nhãn kết thúc không muộn hơn 31/12/2023.
+- Validation: nhãn trong năm 2024.
+- Test: nhãn từ 01/01/2025.
 
-LSTM là đối chứng tuần tự phổ biến, được dùng để xem lợi ích có đến từ Selective SSM hay chỉ từ việc dùng một mạng chuỗi. LSTM dùng một lớp hidden size 8 và có 585 tham số.
+Scaler feature, scaler target và ngưỡng tail loss chỉ fit trên train. Early stopping chỉ dùng validation. Test không tham gia chọn epoch hoặc siêu tham số.
 
-Selective SSM dùng RMSNorm, chiếu đầu vào, causal depthwise convolution, tham số chọn lọc Delta/B/C, cổng SiLU, residual connection và trạng thái có d_state bằng 8. Cập nhật trạng thái có dạng `h_t = a_t * h_(t-1) + b_t`; mã dùng prefix scan theo phép ghép affine kết hợp để xử lý toàn bộ cửa sổ nhưng test đơn vị chứng minh kết quả khớp truy hồi tuần tự. Bản cơ sở có 545 tham số; bản thêm VN-Index có 553 tham số. Quy mô gần LSTM nhằm hạn chế kết luận bị chi phối bởi số tham số trên dữ liệu không quá lớn.
+### 5.2 Hai trục so sánh
 
-### 4.3. Vì sao tự triển khai thay vì dùng mã MambaStock
+| Trục | Cấu hình |
+|---|---|
+| Baseline | zero return (chỉ return), Train Mean |
+| Kiến trúc | LSTM, Selective SSM (Mamba-style) |
+| Nguồn dữ liệu | Market-only, Market+News |
+| Ablation tin | bỏ sentiment, bỏ news count |
 
-Mã dự án không fork, import hoặc sửa tiếp code MambaStock. MambaStock chỉ là tài liệu tham khảo học thuật. Selective SSM ở đây là hiện thực độc lập, tối giản theo mô tả trong bài Mamba [1], điều chỉnh cho bài toán hồi quy 30 phiên và dữ liệu Việt Nam. Cách làm này giúp kiểm soát rõ phần nào được dùng, pipeline nào tạo target và cách đánh giá nào áp dụng; đồng thời tránh trình bày nhầm mã thí nghiệm này như một bản benchmark chính thức của MambaStock hoặc thư viện `mamba_ssm`.
+Mỗi kiến trúc được chạy trên cùng tập feature. Do mô hình chính huấn luyện riêng từng mã, nghiên cứu không dùng ticker embedding và không thực hiện ablation embedding. Nếu sau này xây dựng mô hình pooled cho tám mã, ticker embedding phải được đăng ký như một thí nghiệm riêng.
 
-Do đó, tên chính xác trong báo cáo là **Selective SSM lấy cảm hứng từ Mamba**. Không nên tuyên bố đây là tái lập nguyên xi MambaStock hay kết quả so sánh trực tiếp với implementation CUDA chính thức.
+### 5.3 Lặp và độ nhạy
 
-### 4.4. Thiết lập huấn luyện
+Mạng được chạy với các seed `42, 52, 62, 72, 82`; baseline xác định chỉ cần một lần. Cấu hình chính dùng cửa sổ 30 phiên, cutoff 15:00 và MSE thường (`tail_weight=1`). Phân tích độ nhạy được phép kiểm tra cửa sổ 20/30/60, tail weight 1/2 và cutoff 14/15/16, nhưng phải công bố cả lưới thay vì chỉ chọn cấu hình tốt trên test.
 
-Adam với learning rate 0,001, tối đa 40 epoch và early stopping patience 8 được dùng nhất quán. Early stopping dựa trên validation để giảm nguy cơ chọn mô hình theo test. Năm seed 42, 52, 62, 72 và 82 được dùng vì khởi tạo mạng và tối ưu ngẫu nhiên có thể làm thay đổi kết quả; báo cáo vì vậy có cả trung bình và độ lệch chuẩn qua seed. Các hyperparameter này là cấu hình nghiên cứu, không phải kết quả của tối ưu hóa theo test.
+## 6. Chỉ số và kiểm định
 
-## 5. Đánh giá và kiểm định
+Hai bài toán báo cáo RMSE, MAE và $R^2_{OOS}$. Return báo cáo thêm Directional Accuracy; volatility báo cáo thêm QLIKE. Mỗi bảng cần có kết quả từng mã, mean ± std giữa seed và tổng hợp toàn nhóm sau khi mỗi mã được cho trọng số bằng nhau.
 
-RMSE và MAE đo độ lớn sai số, nên càng nhỏ càng tốt. R2 cho biết phần biến thiên được mô hình giải thích; R2 âm nghĩa là kém dự báo hằng bằng trung bình của chính test theo metric này. Directional Accuracy (DA) đo đúng dấu tăng/giảm, nhưng không phản ánh độ lớn sai số; vì vậy DA cao không tự động có nghĩa mô hình tốt hơn.
+Kiểm định HAC dùng chênh lệch squared loss giữa mạng và Train Mean trên cùng quan sát test. Với volatility 5 phiên chồng lấn, độ trễ HAC tối thiểu là $H-1$. p-value chỉ là bằng chứng bổ sung; kết luận phải xét cả độ lớn cải thiện và độ ổn định.
 
-Kết quả nhóm được tổng hợp theo hai tầng: trung bình seed cho từng mã trước, rồi trung bình các mã để mỗi mã có cùng trọng số. `KIEM_DINH_HAC_VI.csv` so sánh squared loss của từng seed mạng với baseline zero trên đúng các ngày test; phương sai dài hạn dùng trọng số HAC và p-value xấp xỉ chuẩn. Kiểm định này là bằng chứng bổ sung, không thay thế RMSE/MAE, kiểm tra nhiều seed và phân tích từng mã.
+## 7. Kết quả ma trận chính
 
-## 6. Kết quả thực nghiệm
+Ma trận chính đã hoàn thành 344 lượt chạy và 151.016 dự báo. Snapshot tin sau lọc gồm 14.090 tiêu đề và đạt tối thiểu hàng chục đến hàng trăm bài cho mỗi mã trong từng tập. Không seed/mã nào được loại khỏi tổng hợp.
 
-| Mô hình                   | Cửa sổ phiên | Tập đặc trưng                                | Số mã | Số seed | Số tham số | RMSE trung bình | MAE trung bình | R² trung bình | DA trung bình | ĐLC RMSE giữa mã | ĐLC MAE giữa mã | ĐLC R² giữa mã | ĐLC DA giữa mã | ĐLC RMSE giữa seed | ĐLC MAE giữa seed | ĐLC R² giữa seed | ĐLC DA giữa seed |
-| ------------------------- | ------------ | -------------------------------------------- | ----- | ------- | ---------- | --------------- | -------------- | ------------- | ------------- | ---------------- | --------------- | -------------- | -------------- | ------------------ | ----------------- | ---------------- | ---------------- |
-| Baseline return bằng 0    | 30           | Không áp dụng                                | 8     | 1       | 0          | 0.018928        | 0.012859       | -0.001364     | 0.078588      | 0.002384         | 0.002028        | 0.001438       | 0.028659       | 0.000000           | 0.000000          | 0.000000         | 0.000000         |
-| Baseline trung bình train | 30           | Không áp dụng                                | 8     | 1       | 0          | 0.018918        | 0.012899       | -0.000482     | 0.462415      | 0.002370         | 0.002005        | 0.000441       | 0.033765       | 0.000000           | 0.000000          | 0.000000         | 0.000000         |
-| LSTM                      | 30           | OHLCV và đặc trưng dẫn xuất                  | 8     | 5       | 585        | 0.019195        | 0.013171       | -0.030056     | 0.459055      | 0.002443         | 0.002043        | 0.013938       | 0.018197       | 0.000323           | 0.000339          | 0.036557         | 0.021752         |
-| Selective SSM cơ sở       | 30           | OHLCV và đặc trưng dẫn xuất                  | 8     | 5       | 545        | 0.019145        | 0.013180       | -0.024805     | 0.459510      | 0.002390         | 0.002023        | 0.008905       | 0.019179       | 0.000155           | 0.000189          | 0.016868         | 0.022782         |
-| Selective SSM có VN-Index | 30           | OHLCV, đặc trưng dẫn xuất và return VN-Index | 8     | 5       | 553        | 0.019156        | 0.013211       | -0.026057     | 0.461048      | 0.002433         | 0.002066        | 0.020065       | 0.016982       | 0.000354           | 0.000375          | 0.038090         | 0.022012         |
+Với return, Train Mean vẫn tốt nhất theo RMSE 0,018918. LSTM Market+News đạt 0,019228, tốt hơn nhẹ LSTM Market-only 0,019319 nhưng vẫn kém baseline và chỉ cải thiện ở 16/40 cặp mã–seed. Mamba Market+News đạt 0,019127, kém nhẹ Mamba Market-only 0,019081 và cải thiện ở 18/40 cặp. Do đó chưa có bằng chứng ổn định rằng news cải thiện dự báo return.
 
-Baseline trung bình train là mô hình có RMSE thấp nhất: 0.018918. Trong ba mạng, Selective SSM cơ sở có RMSE tốt nhất: 0.019145, nhưng vẫn cao hơn baseline 0.000227. Selective SSM thêm VN-Index có chênh lệch RMSE +0.000011 so với bản cơ sở; trong đó dấu dương nghĩa là RMSE tăng. DA của các mạng gần baseline train mean, nên không có cơ sở dùng DA để đảo ngược kết luận theo sai số.
+Với volatility, Mamba Market-only đạt RMSE nhóm 0,009779, thấp hơn LSTM Market-only 0,009871 và Train Mean 0,010576. Mamba Market-only cũng tốt nhất theo $R^2_{OOS}$ nhóm (0,142239) và QLIKE (0,683595). Khi thêm news, RMSE tăng lên 0,009905 với Mamba và 0,010110 với LSTM; số cặp news tốt hơn chỉ là 18/40 và 14/40. Như vậy các feature tin hiện tại chưa tạo giá trị tăng thêm ổn định cho volatility, dù các mạng nói chung vẫn dự báo volatility tốt hơn Train Mean theo RMSE.
 
-Do đó, kết quả chính là một **kết quả âm có kiểm soát**: với feature hiện có và cửa sổ 30 phiên, mạng phức tạp chưa tạo lợi ích dự báo trung bình nhóm rõ ràng hơn baseline hằng. Đây là kết luận tốt hơn việc chỉ chọn vài ticker/seed đẹp hoặc chỉ báo cáo metric thuận lợi.
+## 8. Khung bảng kết quả cuối
 
-## 7. Thảo luận: vì sao kết quả có thể như vậy
+### Bài toán return
 
-Thứ nhất, return một phiên phụ thuộc nhiều vào thông tin mới, tâm lý và sự kiện chưa có trong OHLCV quá khứ. Mô hình chỉ thấy giá, khối lượng và một biến thị trường chung, nên không có lý do để mặc định nó vượt dự báo hằng. Thứ hai, quan hệ thị trường có thể thay đổi giữa giai đoạn train, validation và test; mẫu hình học được ở quá khứ không nhất thiết ổn định ở tương lai. Thứ ba, VN-Index là chỉ báo rộng và chỉ được đưa vào dưới dạng một return ngày; nó có thể chưa bổ sung thông tin ngoài feature giá của từng cổ phiếu.
+| Mô hình | Tập đặc trưng | RMSE nhóm | MAE nhóm | $R^2_{OOS}$ | DA |
+|---|---|---:|---:|---:|---:|
+| Train Mean | Không áp dụng | 0,018918 | 0,012904 | 0,000000 | 0,462415 |
+| LSTM | Market-only | 0,019319 | 0,013368 | -0,044754 | 0,463895 |
+| LSTM | Market+News | 0,019228 | 0,013224 | -0,032925 | 0,455752 |
+| Mamba | Market-only | 0,019081 | 0,013147 | -0,017150 | 0,456720 |
+| Mamba | Market+News | 0,019127 | 0,013184 | -0,022165 | 0,459226 |
 
-Các giải thích này là giả thuyết hợp lý, không phải chứng minh nhân quả. Không thể kết luận Selective SSM không phù hợp với mọi dữ liệu tài chính; chỉ có thể kết luận cấu hình đã chạy chưa vượt baseline. Điều này cũng giải thích vì sao báo cáo giữ nguyên R2 âm và không biến DA thành kết luận đầu tư.
+### Bài toán volatility
 
-## 8. Độ tin cậy, khả năng tái lập và giới hạn
+| Mô hình | Tập đặc trưng | RMSE nhóm | MAE nhóm | $R^2_{OOS}$ | QLIKE |
+|---|---|---:|---:|---:|---:|
+| Train Mean | Không áp dụng | 0,010576 | 0,008696 | 0,000000 | 0,692187 |
+| LSTM | Market-only | 0,009871 | 0,007530 | 0,125247 | 0,728266 |
+| LSTM | Market+News | 0,010110 | 0,007536 | 0,079817 | 0,834817 |
+| Mamba | Market-only | 0,009779 | 0,007554 | 0,142239 | 0,683595 |
+| Mamba | Market+News | 0,009905 | 0,007624 | 0,118645 | 0,761999 |
 
-`EXPERIMENT_MANIFEST.json` lưu commit, SHA-256 các tệp mã chính, phiên bản Python/PyTorch, CPU/GPU, seed, window, epoch, batch size và manifest dữ liệu. Bộ chạy tạo 136 cấu hình và 59.704 dự báo; `verify_project.py` kiểm tra đủ lần chạy, tính hữu hạn và ghép đúng metric–prediction. Test đơn vị kiểm tra dữ liệu, quan hệ input–target, scaler không nhận giá trị tương lai, baseline, selective scan và metric.
+## 9. Quy tắc kết luận
 
-Giới hạn quan trọng gồm: chỉ một khoảng test hậu 2025; chưa có walk-forward evaluation; chưa có news/sentiment, vĩ mô, báo cáo tài chính hay feature ngành; chưa tối ưu siêu tham số có kiểm soát; chưa có backtest chi phí giao dịch. Cảnh báo dữ liệu VN-Index được giữ lại trong manifest thay vì âm thầm sửa dữ liệu. Các giới hạn này cần xuất hiện trong báo cáo Word sau này.
+- Chỉ kết luận Mamba tốt hơn khi so trên cùng feature và Mamba vượt cả LSTM lẫn Train Mean một cách ổn định.
+- Chỉ kết luận news có ích khi cùng mô hình Market+News tốt hơn Market-only.
+- Nếu kết quả khác nhau giữa các mã, phải nêu rõ tính không đồng nhất thay vì chỉ báo cáo trung bình nhóm.
+- Nếu $R^2_{OOS}<0$ hoặc RMSE cao hơn Train Mean, ghi nhận kết quả âm; không loại baseline hoặc chọn riêng seed thuận lợi.
 
-## 9. Kết luận và hướng tiếp theo
+## 10. Trạng thái hoàn thiện
 
-Đề tài đã tạo một pipeline hồi quy return có kiểm soát leakage, có baseline, lặp nhiều seed, kiểm tra chất lượng dữ liệu và đầu ra tái lập. Tuy nhiên, câu trả lời hiện tại cho hai câu hỏi nghiên cứu là: chưa có bằng chứng Selective SSM vượt baseline train mean; thêm return VN-Index cũng chưa giảm RMSE. Hướng hợp lý là walk-forward validation, window 60/90 đã đăng ký trước, feature tin tức/sentiment hoặc vĩ mô, rồi mới mở rộng sang volatility forecast và risk classification bằng target riêng.
-
-## Tài liệu tham khảo
-
-1. Gu, A., & Dao, T. (2023). Mamba: Linear-Time Sequence Modeling with Selective State Spaces. arXiv:2312.00752.
-2. Hochreiter, S., & Schmidhuber, J. (1997). Long Short-Term Memory. Neural Computation, 9(8), 1735-1780.
-3. Shi, Z. (2024). MambaStock: Selective State Space Model for Stock Prediction. arXiv:2402.18959.
-4. Hyndman, R. J., & Athanasopoulos, G. (2021). Forecasting: Principles and Practice (3rd ed.). OTexts.
-5. Newey, W. K., & West, K. D. (1987). A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. Econometrica, 55(3), 703-708.
+Mã nguồn cho hai target, thu thập và đồng bộ tin theo cutoff, Market-only/Market+News, hai ablation, nhiều seed, sensitivity, metric và bảng tổng hợp đã được chuẩn bị. Ma trận chính đã hoàn thành và được xác minh. Snapshot tin được tạo cục bộ theo [NEWS_DATA_SCHEMA.md](../NEWS_DATA_SCHEMA.md). Kết quả news hiện được xem là kết quả của sentiment baseline; trước khi khóa bài báo, nhóm phải hoàn tất gán nhãn mẫu kiểm tra sentiment và lưu Accuracy/F1 vào phụ lục.

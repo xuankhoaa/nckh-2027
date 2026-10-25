@@ -1,4 +1,4 @@
-"""A compact LSTM baseline with the same input and output convention as Mamba."""
+"""LSTM đối chứng có cùng quy ước đầu vào và đầu ra như Selective SSM."""
 
 import torch
 from torch import nn

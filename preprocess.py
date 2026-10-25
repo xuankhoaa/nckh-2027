@@ -4,13 +4,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
-
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from config import BASE_FEATURES, VNINDEX_FEATURE, TimeSplit
+from config import (
+    BASE_FEATURES,
+    DEFAULT_NEWS_CUTOFF_HOUR,
+    DEFAULT_VOLATILITY_HORIZON,
+    FEATURE_SETS,
+    NEWS_FEATURES,
+    VNINDEX_FEATURE,
+    TimeSplit,
+)
 from data_quality import REQUIRED_OHLCV, validate_ohlcv
 
 
@@ -46,8 +52,82 @@ def _read_ohlcv(path: Path) -> pd.DataFrame:
     return frame
 
 
-def build_feature_frame(ticker: str, data_dir: Path | str = "data") -> pd.DataFrame:
-    """Create features known at market close on t and target return at t+1."""
+def _news_timestamp(value: object) -> pd.Timestamp:
+    """Chuẩn hóa thời gian tin; thời gian không có múi giờ được hiểu là giờ Việt Nam."""
+    timestamp = pd.Timestamp(value)
+    if pd.isna(timestamp):
+        raise ValueError("published_at chứa thời gian không hợp lệ.")
+    if timestamp.tzinfo is None:
+        return timestamp.tz_localize("Asia/Ho_Chi_Minh")
+    return timestamp.tz_convert("Asia/Ho_Chi_Minh")
+
+
+def aggregate_news_features(
+    news_path: Path | str,
+    ticker: str,
+    trading_dates: pd.Series,
+    cutoff_hour: int = DEFAULT_NEWS_CUTOFF_HOUR,
+) -> pd.DataFrame:
+    """Gộp tin theo phiên đầu tiên mà tin đã thực sự sẵn có, không nhìn trước.
+
+    CSV đầu vào ở mức bài báo phải có ``published_at``, ``ticker`` và
+    ``sentiment_score`` trong [-1, 1]. Tin xuất bản từ giờ đóng cửa trở đi được
+    chuyển sang phiên giao dịch kế tiếp; tin cuối tuần cũng được chuyển sang
+    phiên kế tiếp.
+    """
+    if not 0 <= cutoff_hour <= 23:
+        raise ValueError("cutoff_hour phải nằm trong [0, 23].")
+    path = Path(news_path)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Thiếu dữ liệu tin tức {path}. Xem NEWS_DATA_SCHEMA.md; không được thay bằng dữ liệu giả."
+        )
+    news = pd.read_csv(path)
+    required = {"published_at", "ticker", "sentiment_score"}
+    missing = required.difference(news.columns)
+    if missing:
+        raise ValueError(f"{path.name} thiếu các cột: {sorted(missing)}")
+    news = news.loc[:, ["published_at", "ticker", "sentiment_score"]].copy()
+    news["ticker"] = news["ticker"].astype(str).str.upper().str.strip()
+    news = news.loc[news["ticker"].eq(ticker.upper())].copy()
+    if news.empty:
+        raise ValueError(f"Không có bài báo nào cho {ticker} trong {path.name}.")
+    news["sentiment_score"] = pd.to_numeric(news["sentiment_score"], errors="raise")
+    if not np.isfinite(news["sentiment_score"]).all() or not news["sentiment_score"].between(-1, 1).all():
+        raise ValueError("sentiment_score phải là số hữu hạn trong [-1, 1].")
+    news["published_local"] = news["published_at"].map(_news_timestamp)
+    news["available_date"] = news["published_local"].map(
+        lambda value: value.normalize().tz_localize(None)
+        + pd.Timedelta(days=int(value.hour >= cutoff_hour))
+    )
+
+    calendar = pd.DatetimeIndex(pd.to_datetime(trading_dates).drop_duplicates().sort_values())
+    positions = calendar.searchsorted(pd.DatetimeIndex(news["available_date"]), side="left")
+    news = news.loc[positions < len(calendar)].copy()
+    positions = positions[positions < len(calendar)]
+    if news.empty:
+        raise ValueError(f"Tin của {ticker} không giao với khoảng ngày thị trường đang nghiên cứu.")
+    news["time"] = calendar.take(positions).to_numpy()
+    daily = news.groupby("time", as_index=False).agg(
+        sentiment_score=("sentiment_score", "mean"),
+        news_count=("sentiment_score", "size"),
+    )
+    daily["news_count"] = daily["news_count"].astype(float)
+    return daily
+
+
+def build_feature_frame(
+    ticker: str,
+    data_dir: Path | str = "data",
+    *,
+    include_news: bool = False,
+    news_path: Path | str | None = None,
+    news_cutoff_hour: int = DEFAULT_NEWS_CUTOFF_HOUR,
+    volatility_horizon: int = DEFAULT_VOLATILITY_HORIZON,
+) -> pd.DataFrame:
+    """Tạo feature tại t và hai nhãn tương lai, không dùng thông tin sau t."""
+    if volatility_horizon < 1:
+        raise ValueError("volatility_horizon phải dương.")
     data_dir = Path(data_dir)
     stock = _read_ohlcv(data_dir / f"{ticker}.csv")
     vnindex = _read_ohlcv(data_dir / "VNINDEX.csv")
@@ -55,6 +135,9 @@ def build_feature_frame(ticker: str, data_dir: Path | str = "data") -> pd.DataFr
     stock["return"] = np.log(stock["close"] / stock["close"].shift(1))
     stock["volume_change"] = stock["volume"] / stock["volume"].shift(1) - 1.0
     stock["high_low_range"] = (stock["high"] - stock["low"]) / stock["close"]
+    stock["historical_volatility_5d"] = stock["return"].rolling(5).apply(
+        lambda values: float(np.sqrt(np.mean(np.square(values)))), raw=True
+    )
 
     vnindex = vnindex.loc[:, ["time", "close"]].rename(columns={"close": "vnindex_close"})
     vnindex[VNINDEX_FEATURE] = np.log(vnindex["vnindex_close"] / vnindex["vnindex_close"].shift(1))
@@ -66,10 +149,29 @@ def build_feature_frame(ticker: str, data_dir: Path | str = "data") -> pd.DataFr
         validate="one_to_one",
     ).sort_values("time").reset_index(drop=True)
 
-    # Both columns are shifted backward: row t holds the outcome and date of t+1.
+    if include_news:
+        resolved_news_path = Path(news_path) if news_path is not None else data_dir / "news.csv"
+        news_daily = aggregate_news_features(
+            resolved_news_path,
+            ticker,
+            frame["time"],
+            cutoff_hour=news_cutoff_hour,
+        )
+        frame = frame.merge(news_daily, on="time", how="left", validate="one_to_one")
+        frame.loc[:, NEWS_FEATURES] = frame.loc[:, NEWS_FEATURES].fillna(0.0)
+
+    # Row t holds outcomes strictly after the final input observation at t.
     frame["target_return"] = frame["return"].shift(-1)
-    frame["target_date"] = frame["time"].shift(-1)
-    needed = [*BASE_FEATURES, VNINDEX_FEATURE, "target_return", "target_date"]
+    future_squared_returns = pd.concat(
+        [frame["return"].shift(-step).pow(2) for step in range(1, volatility_horizon + 1)],
+        axis=1,
+    )
+    frame["target_volatility"] = np.sqrt(future_squared_returns.mean(axis=1))
+    frame["target_return_date"] = frame["time"].shift(-1)
+    frame["target_volatility_date"] = frame["time"].shift(-volatility_horizon)
+    needed = [*BASE_FEATURES, VNINDEX_FEATURE]
+    if include_news:
+        needed.extend(NEWS_FEATURES)
     return frame.dropna(subset=needed).reset_index(drop=True)
 
 
@@ -89,17 +191,34 @@ def _stack(items: list[np.ndarray], width: int, window: int) -> np.ndarray:
 
 def make_sequence_split(
     frame: pd.DataFrame,
-    include_vnindex: bool,
+    include_vnindex: bool | None = None,
     window: int = 30,
     split: TimeSplit = TimeSplit(),
+    *,
+    feature_set: str | None = None,
+    target: str = "return",
 ) -> SequenceSplit:
     """Build [sample, lookback, feature] tensors without fitting on future data."""
     if window < 2:
         raise ValueError("window must be at least 2.")
 
-    feature_names = tuple(BASE_FEATURES + ((VNINDEX_FEATURE,) if include_vnindex else ()))
+    if target not in ("return", "volatility"):
+        raise ValueError("target phải là 'return' hoặc 'volatility'.")
+    if feature_set is None:
+        # Giữ tương thích với lời gọi cũ trong khi API mới dùng tên tập feature.
+        feature_names = tuple(BASE_FEATURES + ((VNINDEX_FEATURE,) if include_vnindex else ()))
+    else:
+        if feature_set not in FEATURE_SETS:
+            raise ValueError(f"feature_set phải thuộc {tuple(FEATURE_SETS)}")
+        feature_names = tuple(FEATURE_SETS[feature_set])
+    missing_features = set(feature_names).difference(frame.columns)
+    if missing_features:
+        raise ValueError(f"Khung dữ liệu thiếu feature: {sorted(missing_features)}")
+    target_column = f"target_{target}"
+    target_date_column = f"target_{target}_date"
+    frame = frame.dropna(subset=[*feature_names, target_column, target_date_column]).reset_index(drop=True)
     train_end_rows = frame.loc[
-        frame["target_date"] <= pd.Timestamp(split.train_end), "time"
+        frame[target_date_column] <= pd.Timestamp(split.train_end), "time"
     ]
     if train_end_rows.empty:
         raise ValueError("No rows are available for the requested training period.")
@@ -117,10 +236,10 @@ def make_sequence_split(
 
     for end_index in range(window - 1, len(frame)):
         input_end = frame.iloc[end_index]
-        target_date = pd.Timestamp(input_end["target_date"])
+        target_date = pd.Timestamp(input_end[target_date_column])
         label = _split_name(target_date, split)
         sequences[label].append(features[end_index - window + 1 : end_index + 1])
-        targets[label].append(float(input_end["target_return"]))
+        targets[label].append(float(input_end[target_column]))
         dates[label].append(target_date.to_datetime64())
 
         if alignment is None:
@@ -128,7 +247,8 @@ def make_sequence_split(
                 "input_start_date": frame.iloc[end_index - window + 1]["time"].date().isoformat(),
                 "input_end_date": input_end["time"].date().isoformat(),
                 "target_date": target_date.date().isoformat(),
-                "target_return": float(input_end["target_return"]),
+                "target": target,
+                "target_value": float(input_end[target_column]),
             }
 
     if not all(sequences[name] for name in sequences):
@@ -166,5 +286,5 @@ def print_split_summary(dataset: SequenceSplit) -> None:
         f"{dataset.alignment['input_start_date']} ... {dataset.alignment['input_end_date']}",
         "-> target",
         f"{dataset.alignment['target_date']}",
-        f"(log return={dataset.alignment['target_return']:.6f})",
+        f"({dataset.alignment['target']}={dataset.alignment['target_value']:.6f})",
     )

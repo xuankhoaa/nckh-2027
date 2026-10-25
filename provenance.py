@@ -21,6 +21,7 @@ from evaluate import RESULTS_DIR
 PROJECT_DIR = Path(__file__).resolve().parent
 SOURCE_FILES = (
     "config.py",
+    "collect_news.py",
     "data_quality.py",
     "preprocess.py",
     "baselines.py",
@@ -61,9 +62,15 @@ def _version(package: str) -> str | None:
 
 def write_experiment_manifest(
     *,
-    window: int,
+    windows: Iterable[int],
     seeds: Iterable[int],
     tickers: Iterable[str],
+    targets: Iterable[str],
+    feature_sets: Iterable[str],
+    volatility_horizon: int,
+    news_path: str,
+    news_cutoff_hours: Iterable[int],
+    tail_weights: Iterable[float],
     epochs: int,
     batch_size: int,
     started_at: str,
@@ -72,6 +79,8 @@ def write_experiment_manifest(
     symbols = [*dict.fromkeys([*tickers, "VNINDEX"])]
     manifest_path = write_data_manifest(Path("data"), symbols, DATA_SOURCE)
     data_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    news_file = Path(news_path)
+    news_manifest_file = news_file.parent / "NEWS_MANIFEST.json"
     payload = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "started_at_utc": started_at,
@@ -89,10 +98,24 @@ def write_experiment_manifest(
         "experiment": {
             "tickers": list(tickers),
             "seeds": list(seeds),
-            "window": window,
+            "windows": list(windows),
+            "targets": list(targets),
+            "feature_sets": list(feature_sets),
+            "volatility_horizon": volatility_horizon,
+            "news_cutoff_hours": list(news_cutoff_hours),
+            "tail_weights": list(tail_weights),
             "epochs": epochs,
             "batch_size": batch_size,
-            "models": ["naive_zero", "train_mean", "lstm", "mamba_baseline", "improved_mamba"],
+            "models": ["naive_zero", "train_mean", "lstm", "mamba"],
+        },
+        "news_data": {
+            "path": str(news_file),
+            "exists": news_file.is_file(),
+            "sha256": sha256_file(news_file) if news_file.is_file() else None,
+            "collection_manifest_path": str(news_manifest_file),
+            "collection_manifest_sha256": (
+                sha256_file(news_manifest_file) if news_manifest_file.is_file() else None
+            ),
         },
         "data_manifest": data_manifest,
     }
@@ -104,7 +127,20 @@ def write_experiment_manifest(
 
 def main() -> None:
     configure_utf8_output()
-    write_experiment_manifest(window=30, seeds=(42, 52, 62, 72, 82), tickers=TICKERS, epochs=40, batch_size=128, started_at=datetime.now(timezone.utc).isoformat())
+    write_experiment_manifest(
+        windows=(30,),
+        seeds=(42, 52, 62, 72, 82),
+        tickers=TICKERS,
+        targets=("return", "volatility"),
+        feature_sets=("market_only",),
+        volatility_horizon=5,
+        news_path="data/news.csv",
+        news_cutoff_hours=(15,),
+        tail_weights=(1.0,),
+        epochs=40,
+        batch_size=128,
+        started_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 if __name__ == "__main__":

@@ -1,202 +1,150 @@
-# Hướng dẫn A–Z: chạy và kiểm tra đề tài NCKH
+# Hướng dẫn A–Z
 
-Tài liệu này mô tả đầy đủ luồng dữ liệu, cách chạy lại, cách kiểm tra kết quả và ý nghĩa các đầu ra. Bản hiện tại giải quyết **dự báo log-return một phiên kế tiếp** (Bài toán 1), không giải quyết trực tiếp dự báo biến động hay phân loại rủi ro.
+## 1. Đề tài đang kiểm tra gì?
 
-## A. Luồng tổng quát
+Hai bài toán được chạy độc lập:
+
+- `return`: dự báo log-return phiên kế tiếp;
+- `volatility`: dự báo realized volatility của 5 phiên kế tiếp.
+
+Hai kiểu so sánh bắt buộc:
+
+- LSTM với Mamba-style Selective SSM trên cùng feature;
+- Market-only với Market+News trên cùng kiến trúc.
+
+`train_mean` là baseline chung. `naive_zero` chỉ dùng cho return. Ablation tùy chọn lần lượt bỏ sentiment và số lượng tin. Không có ticker embedding trong mô hình riêng từng mã, nên không thực hiện ablation đó.
+
+## 2. Môi trường
+
+Kho dùng Vnstock 4.x trong môi trường riêng. Không cài Vnstock 5.x đè lên môi trường này.
+
+Kết quả hiện tại được tạo bằng môi trường `%USERPROFILE%\.venv`. Trên máy mới,
+kiểm tra môi trường trước khi cài để không ghi đè một thế hệ Vnstock khác:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip show vnstock vnstock_data vnai
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+```
+
+Không gửi API key qua chat và không commit `.env`.
+
+## 3. Dữ liệu thị trường
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
+```
+
+Mỗi CSV cần `time,open,high,low,close,volume`. Pipeline kiểm tra thiếu cột, trùng ngày, giá trị không hữu hạn, quy tắc OHLC và checksum.
+
+## 4. Dữ liệu tin tức
+
+Tạo snapshot từ Google News RSS bằng tên đầy đủ của tám ngân hàng:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" collect_news.py
+```
+
+Script quét theo tháng, tự chia nhỏ khoảng chạm giới hạn kết quả, bắt buộc tên
+ngân hàng xuất hiện trong tiêu đề, loại trùng và tạo:
+
+- `data/news_raw.csv`: metadata tin đã chuẩn hóa;
+- `data/news.csv`: thêm điểm sentiment và nhãn;
+- `data/NEWS_MANIFEST.json`: truy vấn, độ phủ, ngày lấy và checksum;
+- `data/news_validation_sample.csv`: mẫu để nhóm kiểm tra thủ công.
+
+Ba cột tối thiểu mà mô hình sử dụng là:
 
 ```text
-OHLCV cổ phiếu + OHLCV VN-Index
-        ↓
-Kiểm tra chất lượng + đóng băng manifest
-        ↓
-Feature tại t + target return tại t+1
-        ↓
-Chia train / validation / test theo thời gian
-        ↓
-2 baseline + LSTM + 2 Selective SSM, lặp 5 seed
-        ↓
-CSV tiếng Việt + biểu đồ + báo cáo Markdown + manifest tái lập
+published_at,ticker,sentiment_score
 ```
 
-## B. Điều kiện môi trường
+Tin sau cutoff 15:00 và tin cuối tuần được chuyển sang phiên kế tiếp. Dòng không
+có tin nhận `sentiment_score=0` và `news_count=0`. Mỗi mã phải có ít nhất 20 bài
+trong từng tập train/validation/test; nếu không, pipeline dừng trước khi xóa kết
+quả cũ.
 
-Mã tải dữ liệu đang dùng `Quote` của **Vnstock 4.x**. Vì vậy, phải dùng một môi trường tách riêng cho dòng 4.x; không nâng cấp chồng Vnstock 5.x vào cùng môi trường.
+Điền cột `human_label` của mẫu bằng `negative`, `neutral` hoặc `positive`, rồi chạy:
 
 ```powershell
-py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
-Copy-Item .env.example .env
+& "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py
 ```
 
-Mở `.env` và điền khóa của bạn vào `VNSTOCK_API_KEY`. Tệp `.env` đã bị Git bỏ qua. Không gửi khóa qua chat, không đưa vào notebook, mã nguồn, kết quả hay commit.
+Ghi Accuracy, macro-F1 và ma trận nhầm lẫn vào phụ lục. Nếu chất lượng thấp, sửa
+từ điển dựa trên lỗi trong train/validation; không dùng kết quả test dự báo để
+chọn lại từ điển. Chi tiết xem [NEWS_DATA_SCHEMA.md](NEWS_DATA_SCHEMA.md).
 
-Nếu chỉ chạy mô hình từ các CSV đã cache trong `data/`, bước tải dữ liệu không gọi mạng. Tuy nhiên, muốn **tải lại dữ liệu** thì vẫn cần Vnstock 4.x và khóa hợp lệ.
+## 5. Target và leakage
 
-## C. Đầu vào gốc
+Với input kết thúc tại phiên t:
 
-`get_data.py` tải OHLCV ngày cho tám mã `VCB BID CTG MBB TCB ACB VPB STB` và luôn có `VNINDEX`. Mốc mặc định được khóa tại 01/01/2020–12/10/2026 để một lần chạy lại không âm thầm kéo dữ liệu mới hơn.
+- return target là $r_{t+1}$;
+- volatility target là $\sqrt{H^{-1}\sum_{j=1}^{H}r_{t+j}^2}$, mặc định `H=5`.
 
-| Cột CSV | Ý nghĩa |
-|---|---|
-| `time` | Ngày giao dịch, `YYYY-MM-DD` |
-| `open`, `high`, `low`, `close` | Giá mở, cao, thấp, đóng cửa |
-| `volume` | Khối lượng giao dịch |
+Train kết thúc 31/12/2023, validation là năm 2024, test từ 01/01/2025. Mẫu được chia theo ngày cuối target, không phải ngày đầu input. Scaler và ngưỡng 90% cho tail-weighted loss chỉ fit trên train.
 
-Chạy tải/cache:
+## 6. Chạy thử một cấu hình
 
 ```powershell
-.\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
+& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model mamba --ticker VCB --target return --feature-set market_only --seed 42 --epochs 5
 ```
-
-Mặc định một CSV đã tồn tại được dùng lại. Chỉ dùng `--force` khi chủ ý gọi nguồn và ghi đè snapshot:
 
 ```powershell
-.\.venv\Scripts\python.exe get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB --force
+& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model lstm --ticker VCB --target volatility --feature-set market_news --seed 42 --epochs 5
 ```
 
-Sau bước này, `data/DATA_MANIFEST.json` lưu số dòng, ngày đầu/cuối, SHA-256 và cảnh báo dữ liệu. Đó là bằng chứng để người khác xác nhận đang dùng đúng đầu vào, không phải dữ liệu bí mật.
+## 7. Chạy các ma trận
 
-## D. Kiểm tra chất lượng dữ liệu
-
-`data_quality.py` không tự thay đổi số liệu nguồn. Nó chặn các lỗi thiếu cột, trùng ngày, thiếu dữ liệu, số không hữu hạn, giá OHLC không dương, `high < low`, khối lượng âm và `close` nằm ngoài `[low, high]` đối với cổ phiếu.
-
-Với VN-Index, nếu `close` ngoài phạm vi high–low, chương trình ghi **cảnh báo** vào manifest thay vì sửa hoặc xóa dòng. Trong pipeline hiện tại, VN-Index chỉ đóng góp `close` để tính return thị trường; cảnh báo vẫn phải được nêu minh bạch khi viết báo cáo.
-
-## E. Feature engineering
-
-Với giá đóng cửa cổ phiếu $P_t$, khối lượng $V_t$, high $H_t$, low $L_t$ và giá đóng cửa VN-Index $I_t$:
-
-$$
-\begin{aligned}
-r_t &= \ln(P_t/P_{t-1}),\\
-v_t &= V_t/V_{t-1}-1,\\
-q_t &= (H_t-L_t)/P_t,\\
-r_t^{VN} &= \ln(I_t/I_{t-1}).
-\end{aligned}
-$$
-
-Tám feature cơ sở là `open high low close volume return volume_change high_low_range`. Bản Selective SSM cải tiến thêm `vnindex_return` thành chín feature. `vnindex_return` là biến động chỉ số thị trường chung, không phải return của mã đang dự báo.
-
-## F. Target và cửa sổ trượt
-
-Mục tiêu là:
-
-$$
-y_t=r_{t+1}=\ln(P_{t+1}/P_t).
-$$
-
-Với `window=30`, một mẫu là $X_t=[x_{t-29},\ldots,x_t]$ và nhãn là $y_t$. Do đó input kết thúc ở ngày $t$, còn target luôn là phiên sau. Khi chạy một cấu hình, chương trình in ví dụ ghép ngày để kiểm chứng quan hệ này.
-
-## G. Chia dữ liệu và chống leakage
-
-| Tập | Quy tắc theo `target_date` | Được dùng làm gì |
-|---|---|---|
-| Train | `<= 2023-12-31` | Fit feature scaler, target scaler, trọng số |
-| Validation | Năm 2024 | Chọn epoch tốt nhất, early stopping |
-| Test | `>= 2025-01-01` | Chỉ đánh giá cuối |
-
-Mẫu không được shuffle. `StandardScaler.fit()` chỉ nhận các feature train. Mạng còn chuẩn hóa target bằng trung bình/độ lệch chuẩn của `y_train`; `y_valid` và `y_test` chỉ áp dụng đúng tham số đó. Dự báo được đảo chuẩn hóa sang log-return trước khi tính RMSE, MAE, $R^2$ và DA.
-
-## H. Mô hình và tính công bằng
-
-| Mô hình | Số tham số | Ý nghĩa |
-|---|---:|---|
-| `naive_zero` | 0 | Dự báo return bằng 0 |
-| `train_mean` | 0 | Dự báo trung bình return train |
-| `lstm` | 585 | Một lớp LSTM, hidden size 8 |
-| `mamba_baseline` | 545 | Một lớp Selective SSM, chỉ feature cơ sở |
-| `improved_mamba` | 553 | Selective SSM, thêm VN-Index |
-
-Mô hình Selective SSM được viết trong `models/mamba_model.py`, không gọi mã vendored từ MambaStock. Nó gồm RMSNorm, causal depthwise convolution, tham số chọn lọc $\Delta,B,C$, cổng SiLU, residual connection và selective scan. Test đơn vị kiểm tra selective scan theo cây cho kết quả tương đương truy hồi trạng thái tuần tự.
-
-## I. Chạy một cấu hình để kiểm tra
-
-Ví dụ LSTM cho VCB:
+Market-only, hai bài toán:
 
 ```powershell
-.\.venv\Scripts\python.exe train.py --model lstm --ticker VCB --seed 42 --window 30 --epochs 40
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_only
 ```
 
-Ví dụ Selective SSM có VN-Index cho VCB:
+Ma trận chính sau khi có news:
 
 ```powershell
-.\.venv\Scripts\python.exe train.py --model improved_mamba --ticker VCB --seed 42 --window 30 --epochs 40
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py
 ```
 
-`train.py` chỉ chạy đúng một cặp model–ticker–seed. Nó dùng Adam, `learning_rate=0.001`, batch size 128, tối đa 40 epoch và early stopping sau 8 epoch validation không cải thiện. Thực nghiệm riêng có thể thay đổi `--epochs`, `--batch-size`, `--window`, nhưng cần ghi rõ đó không còn là cấu hình chính.
-
-## J. Chạy toàn bộ nghiên cứu
+Thêm ablation:
 
 ```powershell
-.\.venv\Scripts\python.exe run_experiments.py
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --include-ablations
 ```
 
-Lệnh này tự xóa đúng output sinh tự động cũ, sau đó chạy:
-
-$$
-8\ \text{mã} \times (2\ \text{baseline}+3\ \text{mạng}\times5\ \text{seed})=136\ \text{lần chạy}.
-$$
-
-Năm seed là `42, 52, 62, 72, 82`; baseline hằng dùng seed 0. Dùng `--keep-results` chỉ khi chủ ý tiếp tục đúng schema cũ, vì kết quả thiếu hoặc lẫn cấu hình sẽ làm báo cáo không hợp lệ.
-
-## K. Sinh báo cáo tiếng Việt
-
-Khi 136 lần chạy xong:
+Sensitivity có kiểm soát:
 
 ```powershell
-.\.venv\Scripts\python.exe generate_report.py --window 30
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --include-ablations --windows 20 30 60 --tail-weights 1 2 --news-cutoff-hours 14 15 16
 ```
 
-Lệnh chỉ chấp nhận đủ 136 dòng metric của cấu hình chính. Nó tạo:
+Lưới sensitivity làm số lượt chạy tăng mạnh. Nên chạy ma trận chính trước; chỉ chạy lưới đã đăng ký trước, không chọn lại tham số bằng test.
 
-| Đầu ra | Mục đích |
-|---|---|
-| `results/BANG_KET_QUA_CHI_TIET_VI.csv` | Mọi metric theo mã, mô hình, seed |
-| `results/BANG_TONG_HOP_NHOM_VI.csv` | Mean và độ lệch chuẩn giữa mã/seed |
-| `results/DU_BAO_THEO_NGAY_VI.csv` | Actual/predicted log-return theo ngày test |
-| `results/KIEM_DINH_HAC_VI.csv` | So sánh squared loss với zero return |
-| `results/BAO_CAO_KET_QUA.md` | Tóm tắt tự sinh từ kết quả |
-| `bao_cao/BAO_CAO_NCKH.md` | Bản Markdown đầy đủ để chuyển thành Word sau này |
-| `results/bieu_do/` | Biểu đồ loss, dự báo–thực tế, so sánh nhóm |
-
-CSV tiếng Việt được lưu UTF-8 with BOM (`utf-8-sig`) để mở bằng Excel tiếng Việt mà không lỗi dấu.
-
-## L. Đọc metric đúng cách
-
-| Metric | Cách đọc |
-|---|---|
-| RMSE | Càng nhỏ càng tốt; nhạy với lỗi lớn |
-| MAE | Càng nhỏ càng tốt; sai số tuyệt đối trung bình |
-| $R^2$ | Càng lớn càng tốt; âm nghĩa là kém baseline trung bình test theo chỉ số này |
-| DA | Tỷ lệ đúng dấu return; phải đọc cùng RMSE/MAE |
-
-Kiểm định HAC được tính trên chênh lệch squared loss giữa một seed mạng và baseline zero ở các ngày test tương ứng. “Cải thiện MSE so với zero” dương nghĩa là mạng giảm loss trung bình. p-value là bằng chứng hỗ trợ, không thay thế việc xem độ lớn sai số, độ bền qua seed và từng mã.
-
-## M. Xác minh trước khi nộp
+## 8. Sinh và đọc báo cáo
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe -m compileall -q .
-.\.venv\Scripts\python.exe verify_project.py --require-results
+& "$env:USERPROFILE\.venv\Scripts\python.exe" generate_report.py --window 30
 ```
 
-Test bao phủ kiểm tra OHLCV, target sau input, scaler không bị ảnh hưởng bởi giá trị tương lai, output model, selective scan và metric hoàn hảo. `verify_project.py` kiểm tra layout mã, cache dữ liệu, đủ 136 lần chạy, tính hữu hạn của dự báo/metric và ghép đúng predictions với metrics.
+- Return: đọc RMSE, MAE, R² OOS và DA.
+- Volatility: đọc RMSE, MAE, R² OOS và QLIKE.
+- RMSE/MAE/QLIKE càng thấp càng tốt; R² càng cao càng tốt.
+- Luôn xem mean ± std qua seed, từng mã và toàn nhóm.
+- Kiểm định HAC dùng Train Mean làm mốc; cải thiện MSE dương nghĩa là mạng tốt hơn.
 
-## N. Git và dọn dẹp
+## 9. Kiểm tra trước khi nộp
 
-`.env`, `data/`, `results/`, checkpoint và Python cache bị Git bỏ qua. Chúng là secret, input thô hoặc output tái tạo được. Mã, test, tài liệu, cấu hình và báo cáo Markdown nguồn được giữ lại. Không chạy lệnh xóa dữ liệu gốc khi chưa sao lưu hoặc chưa xác nhận đúng snapshot cần loại bỏ.
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m unittest discover -s tests -v
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m compileall -q .
+& "$env:USERPROFILE\.venv\Scripts\python.exe" verify_project.py --require-results
+```
 
-## O. Các lỗi thường gặp
+Nếu `results/` vẫn là pilot schema cũ, kiểm tra có `--require-results` sẽ yêu cầu chạy lại. Mặc định `run_experiments.py` chỉ xóa output tái tạo được, không xóa dữ liệu gốc.
 
-| Hiện tượng | Cách xử lý |
-|---|---|
-| `No module named vnstock` | Dùng đúng Python trong `.venv`, cài theo `requirements.txt`; giữ Vnstock 4.x |
-| Thiếu `VNSTOCK_API_KEY` | Tạo `.env` từ `.env.example`, đặt khóa tại máy cục bộ; không commit |
-| Thiếu CSV | Chạy `get_data.py` cho mã cần thiết |
-| Báo thiếu 136 dòng metric | Chạy lại `run_experiments.py` không dùng `--keep-results` |
-| Lỗi dấu tiếng Việt trong Excel | Mở các tệp hậu tố `_VI.csv`; chúng đã dùng UTF-8 BOM |
-| Kết quả khác đôi chút giữa máy | Xác minh `EXPERIMENT_MANIFEST.json`, SHA-256 dữ liệu, phiên bản gói và CPU/GPU |
+## 10. Câu kết luận được phép viết
 
-## P. Phạm vi kết luận
-
-Kết quả chỉ mô tả hiệu quả trên snapshot dữ liệu, horizon một phiên, feature và siêu tham số đã công bố. Không suy rộng thành hiệu quả đầu tư thực tế. Để mở rộng sang Bài toán 2, cần tạo volatility target tương lai; sang Bài toán 3, cần nhãn rủi ro tương lai và mô hình classification với macro-F1/balanced accuracy. Cả hai có thể làm được, nhưng cần thiết kế thí nghiệm độc lập để không làm lẫn mục tiêu với Bài toán 1.
+- “Mamba vượt Train Mean” chỉ khi RMSE thấp hơn và ổn định qua mã/seed.
+- “News có ích” chỉ khi cùng mô hình, cùng seed, Market+News tốt hơn Market-only.
+- Nếu Mamba/LSTM kém Train Mean, báo cáo đó là kết quả âm; không xóa baseline hoặc chọn riêng seed đẹp.
+- Pilot OHLCV cũ không phải kết quả cuối của đề tài hai đầu ra đa nguồn.

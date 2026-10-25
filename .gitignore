@@ -3,5 +3,27 @@ AGENTS.md
 __pycache__/
 *.py[cod]
 data/
-results/
 checkpoints/
+
+# Chỉ lưu các kết quả tổng hợp cần cho báo cáo. Dữ liệu dự báo theo ngày và
+# hàng trăm biểu đồ từng lần chạy được tái tạo bằng run_experiments.py.
+results/*
+!results/BAO_CAO_KET_QUA.md
+!results/EXPERIMENT_MANIFEST.json
+!results/metrics.csv
+!results/group_summary.csv
+!results/group_summary_return_h1_w30.csv
+!results/group_summary_volatility_h5_w30.csv
+!results/per_ticker_summary.csv
+!results/per_ticker_summary_return_h1_w30.csv
+!results/per_ticker_summary_volatility_h5_w30.csv
+!results/statistical_tests.csv
+!results/news_value_tests.csv
+!results/BANG_TONG_HOP_NHOM_VI.csv
+!results/BANG_KET_QUA_CHI_TIET_VI.csv
+!results/KIEM_DINH_HAC_VI.csv
+!results/KIEM_DINH_GIA_TRI_TIN_TUC_VI.csv
+!results/bieu_do/
+results/bieu_do/*
+!results/bieu_do/tong_hop/
+!results/bieu_do/tong_hop/*.png
