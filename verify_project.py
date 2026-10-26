@@ -17,8 +17,19 @@ from evaluate import RESULTS_DIR
 
 IDENTITY = [
     "model", "ticker", "target", "horizon", "window", "feature_set",
-    "news_cutoff_hour", "tail_weight", "seed", "parameter_count",
+    "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
+    "validation_shrinkage", "seed", "parameter_count",
 ]
+
+
+def _boolean_series(values: pd.Series) -> pd.Series:
+    """Đọc cột bool ổn định dù pandas trả về bool hay chuỗi."""
+    if pd.api.types.is_bool_dtype(values):
+        return values
+    normalized = values.astype(str).str.strip().str.lower()
+    if not normalized.isin({"true", "false"}).all():
+        raise ValueError("Cột validation_shrinkage phải chỉ chứa true/false.")
+    return normalized.eq("true")
 
 
 def assert_source_layout() -> None:
@@ -45,12 +56,19 @@ def _expected_runs(manifest: dict[str, object]) -> int:
     experiment = manifest["experiment"]
     total = 0
     for target in experiment["targets"]:
-        baseline_count = 2 if target == "return" else 1
+        horizons = experiment["return_horizons"] if target == "return" else [experiment["volatility_horizon"]]
+        constant_count = 2 if target == "return" else 1
+        ridge_count = len(experiment["feature_sets"]) if experiment.get("include_ridge", False) else 0
         neural_count = 0
         for feature_set in experiment["feature_sets"]:
-            cutoff_count = len(experiment["news_cutoff_hours"]) if feature_set != "market_only" else 1
+            cutoff_count = len(experiment["news_cutoff_hours"]) if "news" in feature_set else 1
             neural_count += 2 * len(experiment["seeds"]) * len(experiment["tail_weights"]) * cutoff_count
-        total += len(experiment["tickers"]) * len(experiment["windows"]) * (baseline_count + neural_count)
+        total += (
+            len(horizons)
+            * len(experiment["tickers"])
+            * len(experiment["windows"])
+            * (constant_count + ridge_count + neural_count)
+        )
     return total
 
 
@@ -71,7 +89,10 @@ def assert_experiment_outputs() -> None:
     ]
     if changed_sources:
         raise ValueError(f"Mã nguồn đã khác manifest của lần chạy: {changed_sources}")
-    required_metrics = {*IDENTITY, "rmse", "mae", "r2_test", "r2_oos", "directional_accuracy", "qlike"}
+    required_metrics = {
+        *IDENTITY, "rmse", "mae", "r2_test", "r2_oos",
+        "directional_accuracy", "qlike", "ridge_alpha", "shrinkage_alpha",
+    }
     required_predictions = {*IDENTITY, "date", "actual_value", "predicted_value"}
     if not required_metrics.issubset(metrics.columns) or not required_predictions.issubset(predictions.columns):
         raise ValueError("Output thuộc schema cũ; hãy chạy lại không dùng --keep-results.")
@@ -88,6 +109,14 @@ def assert_experiment_outputs() -> None:
         raise ValueError("Bài toán return thiếu DA hữu hạn.")
     if volatility_rows.any() and not np.isfinite(metrics.loc[volatility_rows, "qlike"]).all():
         raise ValueError("Bài toán volatility thiếu QLIKE hữu hạn.")
+    ridge_rows = metrics["model"].eq("ridge")
+    if ridge_rows.any() and not np.isfinite(metrics.loc[ridge_rows, "ridge_alpha"]).all():
+        raise ValueError("Ridge thiếu alpha được chọn trên validation.")
+    shrunk_rows = metrics["model"].isin(["lstm", "mamba"]) & _boolean_series(
+        metrics["validation_shrinkage"]
+    )
+    if shrunk_rows.any() and not metrics.loc[shrunk_rows, "shrinkage_alpha"].between(0, 1).all():
+        raise ValueError("Hệ số validation shrinkage phải nằm trong [0, 1].")
     prediction_ids = predictions.loc[:, IDENTITY].drop_duplicates()
     metric_ids = metrics.loc[:, IDENTITY].drop_duplicates()
     paired = metric_ids.merge(prediction_ids, on=IDENTITY, how="outer", indicator=True)

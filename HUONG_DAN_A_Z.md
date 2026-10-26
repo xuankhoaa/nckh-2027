@@ -4,7 +4,7 @@
 
 Hai bài toán được chạy độc lập:
 
-- `return`: dự báo log-return phiên kế tiếp;
+- `return`: dự báo log-return phiên kế tiếp; chạy thêm horizon 5 phiên để kiểm tra tín hiệu ít nhiễu hơn;
 - `volatility`: dự báo realized volatility của 5 phiên kế tiếp.
 
 Hai kiểu so sánh bắt buộc:
@@ -12,7 +12,10 @@ Hai kiểu so sánh bắt buộc:
 - LSTM với Mamba-style Selective SSM trên cùng feature;
 - Market-only với Market+News trên cùng kiến trúc.
 
-`train_mean` là baseline chung. `naive_zero` chỉ dùng cho return. Ablation tùy chọn lần lượt bỏ sentiment và số lượng tin. Không có ticker embedding trong mô hình riêng từng mã, nên không thực hiện ablation đó.
+`train_mean` là baseline chung. `naive_zero` chỉ dùng cho return; Ridge là
+baseline tuyến tính chọn alpha trên validation. Ablation tùy chọn lần lượt bỏ
+sentiment và số lượng tin. Không có ticker embedding trong mô hình riêng từng
+mã, nên không thực hiện ablation đó.
 
 ## 2. Môi trường
 
@@ -77,19 +80,21 @@ chọn lại từ điển. Chi tiết xem [NEWS_DATA_SCHEMA.md](NEWS_DATA_SCHEMA
 
 Với input kết thúc tại phiên t:
 
-- return target là $r_{t+1}$;
+- return target là $\sum_{j=1}^{h}r_{t+j}$ với `h=1` (chính) hoặc `h=5` (bổ sung);
 - volatility target là $\sqrt{H^{-1}\sum_{j=1}^{H}r_{t+j}^2}$, mặc định `H=5`.
 
-Train kết thúc 31/12/2023, validation là năm 2024, test từ 01/01/2025. Mẫu được chia theo ngày cuối target, không phải ngày đầu input. Scaler và ngưỡng 90% cho tail-weighted loss chỉ fit trên train.
+Train kết thúc 31/12/2023, validation là năm 2024, test từ 01/01/2025. Mẫu được
+chia theo ngày cuối target, không phải ngày đầu input. Scaler và ngưỡng 90% chỉ
+fit trên train. Hệ số co dự báo và Ridge alpha chỉ được chọn bằng validation.
 
 ## 6. Chạy thử một cấu hình
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model mamba --ticker VCB --target return --feature-set market_only --seed 42 --epochs 5
+& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model mamba --ticker VCB --target return --feature-set market_stationary --seed 42 --epochs 5
 ```
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model lstm --ticker VCB --target volatility --feature-set market_news --seed 42 --epochs 5
+& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model lstm --ticker VCB --target volatility --feature-set market_stationary_news --seed 42 --epochs 5
 ```
 
 ## 7. Chạy các ma trận
@@ -97,7 +102,7 @@ Train kết thúc 31/12/2023, validation là năm 2024, test từ 01/01/2025. M�
 Market-only, hai bài toán:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_only
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_stationary
 ```
 
 Ma trận chính sau khi có news:
@@ -120,6 +125,14 @@ Sensitivity có kiểm soát:
 
 Lưới sensitivity làm số lượt chạy tăng mạnh. Nên chạy ma trận chính trước; chỉ chạy lưới đã đăng ký trước, không chọn lại tham số bằng test.
 
+Nếu một lần chạy bị gián đoạn sau khi đã ghi một phần kết quả:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --resume
+```
+
+Chế độ này bỏ qua đúng các định danh đã hoàn tất rồi ghi manifest đầy đủ khi xong.
+
 ## 8. Sinh và đọc báo cáo
 
 ```powershell
@@ -130,7 +143,7 @@ Lưới sensitivity làm số lượt chạy tăng mạnh. Nên chạy ma trận
 - Volatility: đọc RMSE, MAE, R² OOS và QLIKE.
 - RMSE/MAE/QLIKE càng thấp càng tốt; R² càng cao càng tốt.
 - Luôn xem mean ± std qua seed, từng mã và toàn nhóm.
-- Kiểm định HAC dùng Train Mean làm mốc; cải thiện MSE dương nghĩa là mạng tốt hơn.
+- Kiểm định HAC dùng Train Mean làm mốc; cải thiện MSE dương nghĩa là mô hình tốt hơn.
 
 ## 9. Kiểm tra trước khi nộp
 

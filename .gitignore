@@ -13,9 +13,11 @@ results/*
 !results/metrics.csv
 !results/group_summary.csv
 !results/group_summary_return_h1_w30.csv
+!results/group_summary_return_h5_w30.csv
 !results/group_summary_volatility_h5_w30.csv
 !results/per_ticker_summary.csv
 !results/per_ticker_summary_return_h1_w30.csv
+!results/per_ticker_summary_return_h5_w30.csv
 !results/per_ticker_summary_volatility_h5_w30.csv
 !results/statistical_tests.csv
 !results/news_value_tests.csv

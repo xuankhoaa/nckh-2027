@@ -71,6 +71,7 @@ def reset_generated_results() -> None:
         "metrics.csv",
         "predictions.csv",
         "statistical_tests.csv",
+        "news_value_tests.csv",
         "BAO_CAO_KET_QUA.md",
         "BANG_KET_QUA_CHI_TIET_VI.csv",
         "BANG_TONG_HOP_NHOM_VI.csv",
@@ -110,6 +111,9 @@ def save_experiment_outputs(
     feature_set: str,
     news_cutoff_hour: int,
     tail_weight: float,
+    loss_name: str,
+    weight_decay: float,
+    validation_shrinkage: bool,
     seed: int,
     parameter_count: int,
     dates: np.ndarray,
@@ -128,6 +132,9 @@ def save_experiment_outputs(
         "feature_set": feature_set,
         "news_cutoff_hour": news_cutoff_hour,
         "tail_weight": tail_weight,
+        "loss_name": loss_name,
+        "weight_decay": weight_decay,
+        "validation_shrinkage": validation_shrinkage,
         "seed": seed,
         "parameter_count": parameter_count,
     }
@@ -162,7 +169,11 @@ def plot_learning_curve(
     figure, axis = plt.subplots(figsize=(8, 4))
     axis.plot(train_loss, label="Huấn luyện")
     axis.plot(valid_loss, label="Xác thực")
-    axis.set(title=f"Loss - {target}, {model}, {feature_set}, {ticker}, seed {seed}", xlabel="Epoch", ylabel="MSE có trọng số")
+    axis.set(
+        title=f"Loss - {target}, {model}, {feature_set}, {ticker}, seed {seed}",
+        xlabel="Epoch",
+        ylabel="Loss huấn luyện có trọng số",
+    )
     axis.legend()
     figure.tight_layout()
     suffix = f"{target}_h{horizon}_w{window}_{ticker}_{model}_{feature_set}_c{news_cutoff_hour}_tw{tail_weight:g}_seed_{seed}"
@@ -207,7 +218,11 @@ def per_ticker_summary(window: int, target: str, horizon: int) -> pd.DataFrame:
         & metrics["horizon"].eq(horizon)
     ].copy()
     grouped = metrics.groupby(
-        ["model", "ticker", "target", "horizon", "window", "feature_set", "news_cutoff_hour", "tail_weight"],
+        [
+            "model", "ticker", "target", "horizon", "window", "feature_set",
+            "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
+            "validation_shrinkage",
+        ],
         as_index=False,
     )
     result = grouped.agg(
@@ -229,7 +244,11 @@ def save_group_summary(window: int, target: str, horizon: int) -> pd.DataFrame:
     per_ticker_path = RESULTS_DIR / f"per_ticker_summary_{target}_h{horizon}_w{window}.csv"
     per_ticker.to_csv(per_ticker_path, index=False)
     grouped = per_ticker.groupby(
-        ["model", "target", "horizon", "window", "feature_set", "news_cutoff_hour", "tail_weight"],
+        [
+            "model", "target", "horizon", "window", "feature_set",
+            "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
+            "validation_shrinkage",
+        ],
         as_index=False,
     )
     summary = grouped.agg(

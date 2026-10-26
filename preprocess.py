@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from config import (
     BASE_FEATURES,
     DEFAULT_NEWS_CUTOFF_HOUR,
+    DEFAULT_RETURN_HORIZON,
     DEFAULT_VOLATILITY_HORIZON,
     FEATURE_SETS,
     NEWS_FEATURES,
@@ -123,11 +124,12 @@ def build_feature_frame(
     include_news: bool = False,
     news_path: Path | str | None = None,
     news_cutoff_hour: int = DEFAULT_NEWS_CUTOFF_HOUR,
+    return_horizon: int = DEFAULT_RETURN_HORIZON,
     volatility_horizon: int = DEFAULT_VOLATILITY_HORIZON,
 ) -> pd.DataFrame:
     """Tạo feature tại t và hai nhãn tương lai, không dùng thông tin sau t."""
-    if volatility_horizon < 1:
-        raise ValueError("volatility_horizon phải dương.")
+    if return_horizon < 1 or volatility_horizon < 1:
+        raise ValueError("return_horizon và volatility_horizon phải dương.")
     data_dir = Path(data_dir)
     stock = _read_ohlcv(data_dir / f"{ticker}.csv")
     vnindex = _read_ohlcv(data_dir / "VNINDEX.csv")
@@ -135,9 +137,19 @@ def build_feature_frame(
     stock["return"] = np.log(stock["close"] / stock["close"].shift(1))
     stock["volume_change"] = stock["volume"] / stock["volume"].shift(1) - 1.0
     stock["high_low_range"] = (stock["high"] - stock["low"]) / stock["close"]
+    stock["intraday_return"] = np.log(stock["close"] / stock["open"])
+    stock["overnight_return"] = np.log(stock["open"] / stock["close"].shift(1))
     stock["historical_volatility_5d"] = stock["return"].rolling(5).apply(
         lambda values: float(np.sqrt(np.mean(np.square(values)))), raw=True
     )
+    stock["historical_volatility_20d"] = stock["return"].rolling(20).apply(
+        lambda values: float(np.sqrt(np.mean(np.square(values)))), raw=True
+    )
+    stock["momentum_5d"] = stock["return"].rolling(5).sum()
+    stock["momentum_20d"] = stock["return"].rolling(20).sum()
+    volume_mean = stock["volume"].rolling(20).mean()
+    volume_std = stock["volume"].rolling(20).std(ddof=0)
+    stock["volume_zscore_20d"] = (stock["volume"] - volume_mean) / volume_std.replace(0, np.nan)
 
     vnindex = vnindex.loc[:, ["time", "close"]].rename(columns={"close": "vnindex_close"})
     vnindex[VNINDEX_FEATURE] = np.log(vnindex["vnindex_close"] / vnindex["vnindex_close"].shift(1))
@@ -148,6 +160,9 @@ def build_feature_frame(
         how="inner",
         validate="one_to_one",
     ).sort_values("time").reset_index(drop=True)
+
+    frame["vnindex_momentum_5d"] = frame[VNINDEX_FEATURE].rolling(5).sum()
+    frame["relative_return"] = frame["return"] - frame[VNINDEX_FEATURE]
 
     if include_news:
         resolved_news_path = Path(news_path) if news_path is not None else data_dir / "news.csv"
@@ -161,13 +176,17 @@ def build_feature_frame(
         frame.loc[:, NEWS_FEATURES] = frame.loc[:, NEWS_FEATURES].fillna(0.0)
 
     # Row t holds outcomes strictly after the final input observation at t.
-    frame["target_return"] = frame["return"].shift(-1)
+    future_returns = pd.concat(
+        [frame["return"].shift(-step) for step in range(1, return_horizon + 1)],
+        axis=1,
+    )
+    frame["target_return"] = future_returns.sum(axis=1, min_count=return_horizon)
     future_squared_returns = pd.concat(
         [frame["return"].shift(-step).pow(2) for step in range(1, volatility_horizon + 1)],
         axis=1,
     )
     frame["target_volatility"] = np.sqrt(future_squared_returns.mean(axis=1))
-    frame["target_return_date"] = frame["time"].shift(-1)
+    frame["target_return_date"] = frame["time"].shift(-return_horizon)
     frame["target_volatility_date"] = frame["time"].shift(-volatility_horizon)
     needed = [*BASE_FEATURES, VNINDEX_FEATURE]
     if include_news:

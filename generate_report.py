@@ -10,12 +10,13 @@ import numpy as np
 import pandas as pd
 
 from console import configure_utf8_output
-from evaluate import RESULTS_DIR, save_group_summary
+from evaluate import RESULTS_DIR, per_ticker_summary, save_group_summary
 
 
 MODEL_NAMES = {
     "naive_zero": "Baseline return bằng 0",
     "train_mean": "Baseline trung bình train",
+    "ridge": "Ridge (alpha chọn bằng validation)",
     "lstm": "LSTM",
     "mamba": "Selective SSM (Mamba-style)",
 }
@@ -25,11 +26,23 @@ FEATURE_NAMES = {
     "market_news": "Market + News",
     "market_news_no_sentiment": "Market + số lượng tin",
     "market_news_no_count": "Market + điểm cảm xúc",
+    "market_stationary": "Market stationary",
+    "market_stationary_news": "Market stationary + News",
 }
 TARGET_NAMES = {
-    "return": "Tỷ suất sinh lợi phiên kế tiếp",
+    "return": "Tỷ suất sinh lợi tương lai",
     "volatility": "Độ biến động thực hiện tương lai",
 }
+
+
+def target_display_name(target: str, horizon: int) -> str:
+    if target == "return":
+        return (
+            "Tỷ suất sinh lợi phiên kế tiếp"
+            if horizon == 1
+            else f"Tỷ suất sinh lợi tích lũy {horizon} phiên"
+        )
+    return f"Độ biến động thực hiện {horizon} phiên tương lai"
 
 
 def markdown_table(frame: pd.DataFrame) -> str:
@@ -70,19 +83,23 @@ def hac_squared_loss_test(
 
 
 def statistical_tests(predictions: pd.DataFrame) -> pd.DataFrame:
-    """So sánh từng lần chạy mạng với Train Mean trên đúng các ngày test."""
+    """So sánh từng mô hình học được với Train Mean trên đúng các ngày test."""
     baselines = predictions.loc[
         predictions["model"].eq("train_mean"),
         ["ticker", "target", "horizon", "window", "date", "actual_value", "predicted_value"],
     ]
     records: list[dict[str, object]] = []
-    neural = predictions.loc[predictions["model"].isin(["lstm", "mamba"])]
+    learned = predictions.loc[predictions["model"].isin(["ridge", "lstm", "mamba"])]
     group_columns = [
         "model", "ticker", "target", "horizon", "window", "feature_set",
-        "news_cutoff_hour", "tail_weight", "seed",
+        "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
+        "validation_shrinkage", "seed",
     ]
-    for identity, frame in neural.groupby(group_columns):
-        model, ticker, target, horizon, window, feature_set, cutoff, tail_weight, seed = identity
+    for identity, frame in learned.groupby(group_columns):
+        (
+            model, ticker, target, horizon, window, feature_set, cutoff,
+            tail_weight, loss_name, weight_decay, shrinkage, seed,
+        ) = identity
         matching_baseline = baselines.loc[
             baselines["ticker"].eq(ticker)
             & baselines["target"].eq(target)
@@ -110,6 +127,9 @@ def statistical_tests(predictions: pd.DataFrame) -> pd.DataFrame:
             "feature_set": feature_set,
             "news_cutoff_hour": cutoff,
             "tail_weight": tail_weight,
+            "loss_name": loss_name,
+            "weight_decay": weight_decay,
+            "validation_shrinkage": shrinkage,
             "seed": seed,
             "n_test": len(paired),
             **result,
@@ -119,54 +139,70 @@ def statistical_tests(predictions: pd.DataFrame) -> pd.DataFrame:
 
 def news_value_tests(predictions: pd.DataFrame) -> pd.DataFrame:
     """So sánh ghép cặp Market+News với Market-only cùng mô hình và seed."""
-    market = predictions.loc[
-        predictions["model"].isin(["lstm", "mamba"])
-        & predictions["feature_set"].eq("market_only")
-    ]
-    news = predictions.loc[
-        predictions["model"].isin(["lstm", "mamba"])
-        & predictions["feature_set"].eq("market_news")
-    ]
     records: list[dict[str, object]] = []
     group_columns = [
         "model", "ticker", "target", "horizon", "window",
-        "news_cutoff_hour", "tail_weight", "seed",
+        "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
+        "validation_shrinkage", "seed",
     ]
-    for identity, frame in news.groupby(group_columns):
-        model, ticker, target, horizon, window, cutoff, tail_weight, seed = identity
-        reference = market.loc[
-            market["model"].eq(model)
-            & market["ticker"].eq(ticker)
-            & market["target"].eq(target)
-            & market["horizon"].eq(horizon)
-            & market["window"].eq(window)
-            & market["tail_weight"].eq(tail_weight)
-            & market["seed"].eq(seed)
-        ]
-        paired = frame.merge(
-            reference,
-            on=["model", "ticker", "target", "horizon", "window", "tail_weight", "seed", "date", "actual_value"],
-            suffixes=("_news", "_market"),
-            validate="one_to_one",
-        )
-        result = hac_squared_loss_test(
-            paired["actual_value"].to_numpy(),
-            paired["predicted_value_news"].to_numpy(),
-            paired["predicted_value_market"].to_numpy(),
-            int(horizon),
-        )
-        records.append({
-            "model": model,
-            "ticker": ticker,
-            "target": target,
-            "horizon": horizon,
-            "window": window,
-            "news_cutoff_hour": cutoff,
-            "tail_weight": tail_weight,
-            "seed": seed,
-            "n_test": len(paired),
-            **result,
-        })
+    pairs = {
+        "market_news": "market_only",
+        "market_stationary_news": "market_stationary",
+    }
+    eligible = predictions.loc[predictions["model"].isin(["ridge", "lstm", "mamba"])]
+    for news_feature_set, reference_feature_set in pairs.items():
+        news = eligible.loc[eligible["feature_set"].eq(news_feature_set)]
+        market = eligible.loc[eligible["feature_set"].eq(reference_feature_set)]
+        for identity, frame in news.groupby(group_columns):
+            (
+                model, ticker, target, horizon, window, cutoff, tail_weight,
+                loss_name, weight_decay, shrinkage, seed,
+            ) = identity
+            reference = market.loc[
+                market["model"].eq(model)
+                & market["ticker"].eq(ticker)
+                & market["target"].eq(target)
+                & market["horizon"].eq(horizon)
+                & market["window"].eq(window)
+                & market["tail_weight"].eq(tail_weight)
+                & market["loss_name"].eq(loss_name)
+                & market["weight_decay"].eq(weight_decay)
+                & market["validation_shrinkage"].eq(shrinkage)
+                & market["seed"].eq(seed)
+            ]
+            paired = frame.merge(
+                reference,
+                on=[
+                    "model", "ticker", "target", "horizon", "window",
+                    "tail_weight", "loss_name", "weight_decay",
+                    "validation_shrinkage", "seed", "date", "actual_value",
+                ],
+                suffixes=("_news", "_market"),
+                validate="one_to_one",
+            )
+            result = hac_squared_loss_test(
+                paired["actual_value"].to_numpy(),
+                paired["predicted_value_news"].to_numpy(),
+                paired["predicted_value_market"].to_numpy(),
+                int(horizon),
+            )
+            records.append({
+                "model": model,
+                "ticker": ticker,
+                "target": target,
+                "horizon": horizon,
+                "window": window,
+                "feature_set": news_feature_set,
+                "reference_feature_set": reference_feature_set,
+                "news_cutoff_hour": cutoff,
+                "tail_weight": tail_weight,
+                "loss_name": loss_name,
+                "weight_decay": weight_decay,
+                "validation_shrinkage": shrinkage,
+                "seed": seed,
+                "n_test": len(paired),
+                **result,
+            })
     return pd.DataFrame(records)
 
 
@@ -197,12 +233,26 @@ def _vietnamese_values(frame: pd.DataFrame) -> pd.DataFrame:
         result["model"] = result["model"].map(MODEL_NAMES).fillna(result["model"])
     if "feature_set" in result:
         result["feature_set"] = result["feature_set"].map(FEATURE_NAMES).fillna(result["feature_set"])
+    if "reference_feature_set" in result:
+        result["reference_feature_set"] = (
+            result["reference_feature_set"].map(FEATURE_NAMES).fillna(result["reference_feature_set"])
+        )
     if "target" in result:
-        result["target"] = result["target"].map(TARGET_NAMES).fillna(result["target"])
+        if "horizon" in result:
+            result["target"] = [
+                target_display_name(str(target), int(horizon))
+                for target, horizon in zip(result["target"], result["horizon"])
+            ]
+        else:
+            result["target"] = result["target"].map(TARGET_NAMES).fillna(result["target"])
     return result.rename(columns={
         "model": "Mô hình", "ticker": "Mã", "target": "Bài toán",
         "horizon": "Horizon", "window": "Cửa sổ", "feature_set": "Tập đặc trưng",
         "news_cutoff_hour": "Giờ cutoff tin", "tail_weight": "Trọng số tail",
+        "loss_name": "Hàm mất mát", "weight_decay": "Weight decay",
+        "validation_shrinkage": "Co dự báo theo validation",
+        "shrinkage_alpha": "Hệ số co", "ridge_alpha": "Ridge alpha",
+        "reference_feature_set": "Tập đặc trưng đối chứng",
         "seed": "Seed", "parameter_count": "Số tham số", "rmse": "RMSE",
         "mae": "MAE", "r2_test": "R² test", "r2_oos": "R² OOS so với Train Mean", "directional_accuracy": "DA",
         "qlike": "QLIKE", "date": "Ngày cuối target", "actual_value": "Thực tế",
@@ -233,10 +283,12 @@ def main() -> None:
         raise ValueError(f"Không có kết quả cho window={args.window}.")
 
     summaries: list[pd.DataFrame] = []
+    ticker_summaries: list[pd.DataFrame] = []
     report_sections: list[str] = []
     for target, horizon in selected[["target", "horizon"]].drop_duplicates().itertuples(index=False, name=None):
         summary = save_group_summary(args.window, target, int(horizon))
         summaries.append(summary)
+        ticker_summaries.append(per_ticker_summary(args.window, target, int(horizon)))
         display = _format_summary(summary, target)
         best = summary.loc[summary["rmse_mean"].idxmin()]
         baseline = summary.loc[summary["model"].eq("train_mean")].iloc[0]
@@ -244,7 +296,7 @@ def main() -> None:
         best_neural = neural.loc[neural["rmse_mean"].idxmin()]
         verdict = "vượt" if best_neural["rmse_mean"] < baseline["rmse_mean"] else "chưa vượt"
         report_sections.append(
-            f"## {TARGET_NAMES[target]} (horizon={int(horizon)})\n\n"
+            f"## {target_display_name(target, int(horizon))}\n\n"
             f"{markdown_table(display)}\n\n"
             f"Cấu hình RMSE thấp nhất: **{MODEL_NAMES[best['model']]} / "
             f"{FEATURE_NAMES[best['feature_set']]}** ({best['rmse_mean']:.6f}). "
@@ -252,6 +304,9 @@ def main() -> None:
         )
 
     group_summary = pd.concat(summaries, ignore_index=True)
+    ticker_summary = pd.concat(ticker_summaries, ignore_index=True)
+    group_summary.to_csv(RESULTS_DIR / "group_summary.csv", index=False)
+    ticker_summary.to_csv(RESULTS_DIR / "per_ticker_summary.csv", index=False)
     tests = statistical_tests(predictions.loc[predictions["window"].eq(args.window)].copy())
     news_tests = news_value_tests(predictions.loc[predictions["window"].eq(args.window)].copy())
     _vietnamese_values(selected).to_csv(
@@ -277,7 +332,7 @@ def main() -> None:
             improved=lambda frame: frame["mean_squared_error_improvement"].gt(0),
             significant=lambda frame: frame["p_value_two_sided"].lt(0.05),
         )
-        .groupby(["target", "model"], as_index=False)
+        .groupby(["target", "horizon", "model"], as_index=False)
         .agg(
             paired_runs=("seed", "size"),
             improved_runs=("improved", "sum"),
@@ -305,13 +360,15 @@ def main() -> None:
         manifest_note = f"\n\nManifest lần chạy: Git `{manifest.get('git_commit')}`, Python {manifest.get('python')}."
     report = (
         "# Báo cáo kết quả hai bài toán\n\n"
-        "Mỗi mạng được so sánh trên cùng tập đặc trưng. Train Mean là ngưỡng tối thiểu; "
-        "Market-only và Market+News là thí nghiệm loại bỏ đặc trưng, không phải tên mô hình.\n\n"
+        "Mỗi mô hình được so sánh trên cùng tập đặc trưng. Train Mean là ngưỡng tối thiểu; "
+        "Ridge là baseline tuyến tính chọn mức phạt bằng validation; Market-only và "
+        "Market+News là thí nghiệm loại bỏ đặc trưng, không phải tên mô hình.\n\n"
         + "\n\n".join(report_sections)
         + "\n\n## Cách đọc kết quả\n\n"
         "RMSE/MAE càng thấp càng tốt. DA chỉ dùng cho return; QLIKE chỉ dùng cho volatility. "
-        "Các kiểm định HAC trong `KIEM_DINH_HAC_VI.csv` so sánh từng seed mạng với Train Mean; "
-        "giá trị cải thiện MSE dương mới có lợi cho mạng. Kết luận phải đồng thời xem từng mã, "
+        "Các kiểm định HAC trong `KIEM_DINH_HAC_VI.csv` so sánh từng lần chạy Ridge/mạng với Train Mean; "
+        "giá trị cải thiện MSE dương mới có lợi cho mô hình. Hệ số co dự báo được ước lượng chỉ "
+        "trên validation, không dùng test. Kết luận phải đồng thời xem từng mã, "
         "trung bình nhóm và độ lệch chuẩn giữa seed.\n\n"
         "## Giá trị tăng thêm của tin tức\n\n"
         + markdown_table(news_counts_display)

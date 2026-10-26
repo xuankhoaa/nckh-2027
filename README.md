@@ -2,17 +2,17 @@
 
 Đề tài nghiên cứu ảnh hưởng của dữ liệu thị trường và tâm lý tin tức tới hai bài toán:
 
-1. dự báo log-return cổ phiếu phiên kế tiếp;
+1. dự báo log-return cổ phiếu phiên kế tiếp, kèm horizon 5 phiên bổ sung;
 2. dự báo độ biến động thực hiện trong 5 phiên kế tiếp.
 
 Đối tượng gồm `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB`. Đây là pipeline nghiên cứu có thể tái lập, không phải công cụ tư vấn đầu tư.
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Ma trận thực nghiệm chính | Hoàn thành 344 lượt chạy |
-| Hai bài toán đầu ra | Return 1 phiên và volatility 5 phiên |
+| Ma trận thực nghiệm chính | Hoàn thành 568 lượt chạy, 249.352 dự báo |
+| Hai bài toán đầu ra | Return 1 phiên (chính), return 5 phiên (bổ sung), volatility 5 phiên |
 | Dữ liệu đầu vào | Thị trường và 14.090 tiêu đề tin đã lọc |
-| Kiểm thử | 19/19 kiểm thử đạt |
+| Kiểm thử | 26/26 kiểm thử đạt |
 | Kết quả công bố | Bảng tổng hợp, kiểm định, manifest và biểu đồ đã lưu trong `results/` |
 
 Tài liệu sử dụng và bàn giao:
@@ -40,9 +40,12 @@ Không thực hiện ablation embedding mã cổ phiếu ở thiết kế chính
 
 ### Đầu vào
 
-`Market-only` gồm OHLCV, log-return, thay đổi khối lượng, biên độ high–low, độ biến động lịch sử 5 phiên và return VN-Index.
+`Market stationary` là cấu hình chính: log-return, return trong/qua đêm, thay đổi
+khối lượng, biên độ high–low, volatility 5/20 phiên, momentum 5/20 phiên,
+z-score khối lượng 20 phiên, return/momentum VN-Index và return tương đối. Việc
+loại mức giá tuyệt đối giúp giảm xu hướng không dừng và khác biệt thang giá.
 
-`Market + News` bổ sung:
+`Market stationary + News` bổ sung:
 
 - `sentiment_score`: trung bình điểm cảm xúc theo mã và phiên;
 - `news_count`: số bài theo mã và phiên.
@@ -54,7 +57,7 @@ Hai ablation tùy chọn là `market_news_no_sentiment` và `market_news_no_coun
 Với giá đóng cửa $P_t$ và log-return $r_t=\ln(P_t/P_{t-1})$:
 
 $$
-y_t^{(return)}=r_{t+1},
+y_{t,h}^{(return)}=\sum_{j=1}^{h}r_{t+j},\qquad h\in\{1,5\},
 $$
 
 $$
@@ -75,39 +78,44 @@ Feature scaler và target scaler chỉ fit trên train. Cửa sổ không bị s
 
 ### Mô hình và metric
 
-- Baseline: `train_mean` cho cả hai bài toán; `naive_zero` chỉ dùng cho return.
+- Baseline: `train_mean`; `naive_zero` cho return; Ridge chọn alpha bằng validation.
 - Đối chứng: LSTM.
 - Mô hình nghiên cứu: Selective SSM tối giản lấy cảm hứng từ Mamba.
+- Return dùng Huber loss; cả hai mạng dùng AdamW với weight decay `1e-4`.
+- Dự báo mạng được co về Train Mean bằng hệ số chỉ ước lượng trên validation.
+- Ridge volatility học trên log-volatility để dự báo luôn dương.
 - Return: RMSE, MAE, $R^2_{OOS}$ và Directional Accuracy.
 - Volatility: RMSE, MAE, $R^2_{OOS}$ và QLIKE.
 - Mỗi mạng chạy mặc định 5 seed; báo cáo mean và độ lệch chuẩn theo seed, từng mã và toàn nhóm.
-- Kiểm định HAC so sánh squared loss của mỗi mạng với Train Mean trên cùng ngày test.
+- Kiểm định HAC so sánh squared loss của Ridge/mỗi mạng với Train Mean trên cùng ngày test.
 
 ## Trạng thái dữ liệu và kết quả
 
-Ma trận chính đã hoàn thành **344 lượt chạy** và 151.016 dự báo trên snapshot
+Ma trận chính đã hoàn thành **568 lượt chạy** và **249.352 dự báo** trên snapshot
 14.090 tiêu đề tin. Kết quả trung bình tám mã:
 
 | Bài toán | Mô hình | RMSE | MAE | R² OOS | Metric riêng |
 |---|---|---:|---:|---:|---:|
-| Return | Train Mean | **0,018918** | **0,012904** | 0,000000 | DA 0,462415 |
-| Return | Mamba-style, Market-only | 0,019081 | 0,013147 | -0,017150 | DA 0,456720 |
-| Return | Mamba-style, Market+News | 0,019127 | 0,013184 | -0,022165 | DA 0,459226 |
-| Return | LSTM, Market-only | 0,019319 | 0,013368 | -0,044754 | DA 0,463895 |
-| Return | LSTM, Market+News | 0,019228 | 0,013224 | -0,032925 | DA 0,455752 |
-| Volatility | Train Mean | 0,010576 | 0,008696 | 0,000000 | QLIKE 0,692187 |
-| Volatility | Mamba-style, Market-only | **0,009779** | 0,007554 | **0,142239** | **QLIKE 0,683595** |
-| Volatility | Mamba-style, Market+News | 0,009905 | 0,007624 | 0,118645 | QLIKE 0,761999 |
-| Volatility | LSTM, Market-only | 0,009871 | **0,007530** | 0,125247 | QLIKE 0,728266 |
-| Volatility | LSTM, Market+News | 0,010110 | 0,007536 | 0,079817 | QLIKE 0,834817 |
+| Return h1 | Train Mean | **0,018921** | 0,012921 | 0,000000 | DA 0,462415 |
+| Return h1 | Mamba, Market stationary + News | 0,018923 | 0,012929 | -0,000126 | DA 0,463952 |
+| Return h1 | Mamba, Market stationary | 0,018934 | 0,012939 | -0,001434 | DA 0,467084 |
+| Return h5 | Train Mean | **0,042155** | 0,029591 | 0,000000 | DA 0,520216 |
+| Return h5 | Mamba, Market stationary + News | 0,042208 | 0,029654 | -0,002362 | DA 0,517084 |
+| Return h5 | LSTM, Market stationary + News | 0,042251 | 0,029658 | -0,004272 | DA 0,524601 |
+| Volatility h5 | Train Mean | 0,010491 | 0,008567 | 0,000000 | QLIKE 0,692076 |
+| Volatility h5 | **LSTM, Market stationary** | **0,009671** | 0,007276 | **0,147791** | **QLIKE 0,689216** |
+| Volatility h5 | LSTM, Market stationary + News | 0,009756 | **0,007197** | 0,132772 | QLIKE 0,759970 |
+| Volatility h5 | Mamba, Market stationary | 0,009772 | 0,007333 | 0,128632 | QLIKE 0,730341 |
+| Volatility h5 | Mamba, Market stationary + News | 0,009829 | 0,007278 | 0,118622 | QLIKE 0,784686 |
 
-Return vẫn là kết quả âm: mọi cấu hình mạng đều chưa vượt Train Mean theo RMSE
-và $R^2_{OOS}$ vẫn âm. News giúp RMSE của LSTM giảm nhẹ nhưng chỉ tốt hơn
-Market-only ở 16/40 cặp mã–seed; Mamba+News kém Mamba Market-only trung bình.
+Return vẫn là kết quả âm theo trung bình nhóm, nhưng khoảng cách đã giảm mạnh:
+Mamba h1 với news đạt $R^2_{OOS}=-0,000126$, gần Train Mean hơn nhiều so với
+phiên bản trước. Ở h5, Mamba+News đạt -0,002362. Đây là cải thiện hợp lệ nhưng
+chưa đủ để tuyên bố có khả năng dự báo vượt baseline.
 
-Với volatility, cấu hình tốt nhất vẫn là Mamba Market-only. Market+News làm RMSE
-trung bình xấu đi ở cả LSTM và Mamba; số cặp news tốt hơn lần lượt chỉ là 14/40
-và 18/40. Vì vậy snapshot và sentiment baseline hiện tại **chưa cho bằng chứng
+Với volatility, cấu hình tốt nhất là LSTM Market stationary, đạt
+$R^2_{OOS}=0,147791$. Market+News làm RMSE trung bình xấu đi ở cả LSTM và Mamba;
+số cặp news tốt hơn lần lượt là 16/40 và 17/40. Vì vậy snapshot và sentiment baseline hiện tại **chưa cho bằng chứng
 ổn định rằng tin tức tạo giá trị dự báo tăng thêm**. Đây là kết quả nghiên cứu
 hợp lệ, đồng thời chỉ ra bước tiếp theo là kiểm định/gia cố bộ chấm sentiment,
 không phải loại bỏ Train Mean hay chọn riêng seed thuận lợi.
@@ -172,7 +180,7 @@ thu thập và checksum luôn được ghi vào manifest.
 Chạy mốc Market-only cho cả hai bài toán khi chưa có dữ liệu tin:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_only
+& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_stationary
 ```
 
 Sau khi chuẩn bị `data/news.csv`, chạy ma trận chính Market-only và Market+News:
@@ -233,8 +241,8 @@ thu thập. Không có API key hoặc thông tin đăng nhập nào được đ�
 config.py                 cấu hình target, feature set, ticker và split
 collect_news.py           tải metadata RSS, lọc thực thể và chấm sentiment baseline
 evaluate_sentiment.py     đánh giá mẫu sentiment do nhóm gán nhãn thủ công
-preprocess.py             đồng bộ market/news, tạo target và cửa sổ chống leakage
-train.py                  baseline, LSTM, Selective SSM và tail-weighted loss
+preprocess.py             đồng bộ market/news, feature stationary, target và cửa sổ chống leakage
+train.py                  baseline, Ridge, LSTM, Selective SSM, Huber và validation shrinkage
 run_experiments.py        ma trận chính, ablation và sensitivity
 evaluate.py               metric, bảng tổng hợp và biểu đồ
 generate_report.py        bảng tiếng Việt, kiểm định HAC và báo cáo

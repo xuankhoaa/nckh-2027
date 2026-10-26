@@ -12,7 +12,7 @@ Tỷ suất sinh lợi ngắn hạn có nhiễu lớn và phụ thuộc vào th�
 
 Nghiên cứu giải quyết hai bài toán:
 
-1. dự báo log-return cổ phiếu ở phiên kế tiếp;
+1. dự báo log-return cổ phiếu ở phiên kế tiếp, kèm horizon 5 phiên bổ sung;
 2. dự báo độ biến động thực hiện trong 5 phiên kế tiếp.
 
 Câu hỏi nghiên cứu:
@@ -26,7 +26,13 @@ Câu hỏi nghiên cứu:
 
 Mẫu gồm tám cổ phiếu ngân hàng `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB`, cùng VN-Index. Snapshot thị trường hiện có từ 02/01/2020 đến 12/10/2026.
 
-Nhóm feature thị trường gồm OHLCV, log-return, thay đổi khối lượng, biên độ high–low, realized volatility quá khứ 5 phiên và return VN-Index. Nhóm tin tức gồm sentiment trung bình và số bài theo mã/phiên. Metadata tin được truy hồi từ Google News RSS bằng tên thương hiệu của từng ngân hàng; chỉ lưu tiêu đề, nguồn, URL và thời điểm xuất bản, không lưu toàn văn. Bài chỉ được giữ khi tiêu đề nhắc trực tiếp đúng ngân hàng và được loại trùng theo URL hoặc tiêu đề–ngày.
+Nhóm feature chính dùng các đại lượng stationary: log-return, return trong/qua
+đêm, thay đổi khối lượng, biên độ high–low, volatility và momentum quá khứ,
+z-score khối lượng, return/momentum VN-Index và return tương đối. Nhóm tin tức
+gồm sentiment trung bình và số bài theo mã/phiên. Metadata tin được truy hồi từ
+Google News RSS bằng tên thương hiệu của từng ngân hàng; chỉ lưu tiêu đề, nguồn,
+URL và thời điểm xuất bản, không lưu toàn văn. Bài chỉ được giữ khi tiêu đề nhắc
+trực tiếp đúng ngân hàng và được loại trùng theo URL hoặc tiêu đề–ngày.
 
 Điểm sentiment là NLP baseline từ điển tài chính tiếng Việt trên tiêu đề, nhận giá trị trong $[-1,1]$. Phương pháp này có ưu điểm minh bạch và dễ tái lập nhưng không hiểu đầy đủ ngữ cảnh, phủ định hoặc mỉa mai. Vì vậy nghiên cứu phải báo cáo thêm kiểm tra thủ công trên mẫu phân tầng ba nhãn; không được mô tả điểm tự động là “nhãn thật”. Manifest tin lưu truy vấn, ngày thu thập, độ phủ và checksum snapshot.
 
@@ -37,7 +43,7 @@ Quy tắc thông tin: tin trước 15:00 có thể dùng cho dự báo được 
 Với $r_t=\ln(P_t/P_{t-1})$:
 
 $$
-y_t^{(r)}=r_{t+1}.
+y_{t,h}^{(r)}=\sum_{j=1}^{h}r_{t+j},\qquad h\in\{1,5\}.
 $$
 
 Với horizon $H=5$:
@@ -62,16 +68,22 @@ Scaler feature, scaler target và ngưỡng tail loss chỉ fit trên train. Ear
 
 | Trục | Cấu hình |
 |---|---|
-| Baseline | zero return (chỉ return), Train Mean |
+| Baseline | zero return (chỉ return), Train Mean, Ridge/log-Ridge |
 | Kiến trúc | LSTM, Selective SSM (Mamba-style) |
-| Nguồn dữ liệu | Market-only, Market+News |
+| Nguồn dữ liệu | Market stationary, Market stationary + News |
 | Ablation tin | bỏ sentiment, bỏ news count |
 
 Mỗi kiến trúc được chạy trên cùng tập feature. Do mô hình chính huấn luyện riêng từng mã, nghiên cứu không dùng ticker embedding và không thực hiện ablation embedding. Nếu sau này xây dựng mô hình pooled cho tám mã, ticker embedding phải được đăng ký như một thí nghiệm riêng.
 
 ### 5.3 Lặp và độ nhạy
 
-Mạng được chạy với các seed `42, 52, 62, 72, 82`; baseline xác định chỉ cần một lần. Cấu hình chính dùng cửa sổ 30 phiên, cutoff 15:00 và MSE thường (`tail_weight=1`). Phân tích độ nhạy được phép kiểm tra cửa sổ 20/30/60, tail weight 1/2 và cutoff 14/15/16, nhưng phải công bố cả lưới thay vì chỉ chọn cấu hình tốt trên test.
+Mạng được chạy với các seed `42, 52, 62, 72, 82`; baseline xác định chỉ cần
+một lần. Cấu hình chính dùng cửa sổ 30 phiên, cutoff 15:00, Huber loss cho
+return, MSE cho volatility, AdamW với weight decay $10^{-4}$ và hệ số co dự báo
+chỉ ước lượng trên validation. Ridge alpha cũng chỉ được chọn trên validation;
+volatility Ridge học trên log-target để dự báo dương. Phân tích độ nhạy được
+phép kiểm tra cửa sổ 20/30/60, tail weight 1/2 và cutoff 14/15/16, nhưng phải
+công bố cả lưới thay vì chỉ chọn cấu hình tốt trên test.
 
 ## 6. Chỉ số và kiểm định
 
@@ -81,33 +93,56 @@ Kiểm định HAC dùng chênh lệch squared loss giữa mạng và Train Mean
 
 ## 7. Kết quả ma trận chính
 
-Ma trận chính đã hoàn thành 344 lượt chạy và 151.016 dự báo. Snapshot tin sau lọc gồm 14.090 tiêu đề và đạt tối thiểu hàng chục đến hàng trăm bài cho mỗi mã trong từng tập. Không seed/mã nào được loại khỏi tổng hợp.
+Ma trận chính đã hoàn thành **568 lượt chạy và 249.352 dự báo**. Snapshot tin
+sau lọc gồm 14.090 tiêu đề và đạt tối thiểu hàng chục đến hàng trăm bài cho mỗi
+mã trong từng tập. Không seed/mã nào được loại khỏi tổng hợp.
 
-Với return, Train Mean vẫn tốt nhất theo RMSE 0,018918. LSTM Market+News đạt 0,019228, tốt hơn nhẹ LSTM Market-only 0,019319 nhưng vẫn kém baseline và chỉ cải thiện ở 16/40 cặp mã–seed. Mamba Market+News đạt 0,019127, kém nhẹ Mamba Market-only 0,019081 và cải thiện ở 18/40 cặp. Do đó chưa có bằng chứng ổn định rằng news cải thiện dự báo return.
+Với return một phiên, Train Mean vẫn tốt nhất theo RMSE 0,018921. Mamba Market
+stationary + News đạt 0,018923 và $R^2_{OOS}=-0,000126$: khoảng cách rất nhỏ
+nhưng vẫn chưa vượt baseline. News giúp Mamba ở 20/40 cặp mã–seed, trong khi
+LSTM chỉ cải thiện 19/40 cặp. Với return 5 phiên, Train Mean đạt 0,042155 và
+Mamba+News đạt 0,042208 ($R^2_{OOS}=-0,002362$). Do đó kéo dài horizon và
+regularization làm kết quả sát baseline hơn, nhưng chưa tạo bằng chứng dự báo
+return dương, ổn định trên toàn nhóm.
 
-Với volatility, Mamba Market-only đạt RMSE nhóm 0,009779, thấp hơn LSTM Market-only 0,009871 và Train Mean 0,010576. Mamba Market-only cũng tốt nhất theo $R^2_{OOS}$ nhóm (0,142239) và QLIKE (0,683595). Khi thêm news, RMSE tăng lên 0,009905 với Mamba và 0,010110 với LSTM; số cặp news tốt hơn chỉ là 18/40 và 14/40. Như vậy các feature tin hiện tại chưa tạo giá trị tăng thêm ổn định cho volatility, dù các mạng nói chung vẫn dự báo volatility tốt hơn Train Mean theo RMSE.
+Với volatility, LSTM Market stationary tốt nhất theo RMSE nhóm 0,009671 và
+$R^2_{OOS}=0,147791$, vượt Train Mean 0,010491. Mamba Market stationary đạt
+0,009772 và $R^2_{OOS}=0,128632$. Khi thêm news, RMSE tăng lên 0,009756 với
+LSTM và 0,009829 với Mamba; số cặp news tốt hơn chỉ là 16/40 và 17/40. Như vậy
+các feature tin hiện tại chưa tạo giá trị tăng thêm ổn định cho volatility, dù
+các mạng nói chung vẫn dự báo volatility tốt hơn Train Mean theo RMSE.
 
 ## 8. Bảng kết quả chính
 
-### Bài toán return
+### Bài toán return một phiên
 
 | Mô hình | Tập đặc trưng | RMSE nhóm | MAE nhóm | $R^2_{OOS}$ | DA |
 |---|---|---:|---:|---:|---:|
-| Train Mean | Không áp dụng | 0,018918 | 0,012904 | 0,000000 | 0,462415 |
-| LSTM | Market-only | 0,019319 | 0,013368 | -0,044754 | 0,463895 |
-| LSTM | Market+News | 0,019228 | 0,013224 | -0,032925 | 0,455752 |
-| Mamba | Market-only | 0,019081 | 0,013147 | -0,017150 | 0,456720 |
-| Mamba | Market+News | 0,019127 | 0,013184 | -0,022165 | 0,459226 |
+| Train Mean | Không áp dụng | 0,018921 | 0,012921 | 0,000000 | 0,462415 |
+| LSTM | Market stationary | 0,018954 | 0,012962 | -0,003499 | 0,466629 |
+| LSTM | Market stationary + News | 0,018964 | 0,012967 | -0,004419 | 0,469476 |
+| Mamba | Market stationary | 0,018934 | 0,012939 | -0,001434 | 0,467084 |
+| Mamba | Market stationary + News | 0,018923 | 0,012929 | -0,000126 | 0,463952 |
+
+### Bài toán return 5 phiên (bổ sung)
+
+| Mô hình | Tập đặc trưng | RMSE nhóm | MAE nhóm | $R^2_{OOS}$ | DA |
+|---|---|---:|---:|---:|---:|
+| Train Mean | Không áp dụng | 0,042155 | 0,029591 | 0,000000 | 0,520216 |
+| LSTM | Market stationary | 0,042368 | 0,029718 | -0,010051 | 0,516287 |
+| LSTM | Market stationary + News | 0,042251 | 0,029658 | -0,004272 | 0,524601 |
+| Mamba | Market stationary | 0,042262 | 0,029652 | -0,004833 | 0,520501 |
+| Mamba | Market stationary + News | 0,042208 | 0,029654 | -0,002362 | 0,517084 |
 
 ### Bài toán volatility
 
 | Mô hình | Tập đặc trưng | RMSE nhóm | MAE nhóm | $R^2_{OOS}$ | QLIKE |
 |---|---|---:|---:|---:|---:|
-| Train Mean | Không áp dụng | 0,010576 | 0,008696 | 0,000000 | 0,692187 |
-| LSTM | Market-only | 0,009871 | 0,007530 | 0,125247 | 0,728266 |
-| LSTM | Market+News | 0,010110 | 0,007536 | 0,079817 | 0,834817 |
-| Mamba | Market-only | 0,009779 | 0,007554 | 0,142239 | 0,683595 |
-| Mamba | Market+News | 0,009905 | 0,007624 | 0,118645 | 0,761999 |
+| Train Mean | Không áp dụng | 0,010491 | 0,008567 | 0,000000 | 0,692076 |
+| LSTM | Market stationary | 0,009671 | 0,007276 | 0,147791 | 0,689216 |
+| LSTM | Market stationary + News | 0,009756 | 0,007197 | 0,132772 | 0,759970 |
+| Mamba | Market stationary | 0,009772 | 0,007333 | 0,128632 | 0,730341 |
+| Mamba | Market stationary + News | 0,009829 | 0,007278 | 0,118622 | 0,784686 |
 
 ## 9. Quy tắc kết luận
 

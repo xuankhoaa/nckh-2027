@@ -8,6 +8,7 @@
 - $s_t$: sentiment trung bình của tin được phép dùng tại phiên $t$.
 - $n_t$: số tin được phép dùng tại phiên $t$.
 - $W$: chiều dài cửa sổ input, mặc định 30.
+- $h$: horizon return, cấu hình chính $h=1$ và phân tích bổ sung $h=5$.
 - $H$: horizon volatility, mặc định 5.
 
 ## 2. Feature thị trường
@@ -23,10 +24,13 @@ r_t^{VN}=\ln(I_t/I_{t-1}),
 $$
 
 $$
-\widehat\sigma_{t,5}=\sqrt{\frac{1}{5}\sum_{j=0}^{4}r_{t-j}^2}.
+\widehat\sigma_{t,k}=\sqrt{\frac{1}{k}\sum_{j=0}^{k-1}r_{t-j}^2},\quad k\in\{5,20\}.
 $$
 
-Market-only gồm OHLCV và các đại lượng trên. Market+News bổ sung $(s_t,n_t)$.
+Cấu hình chính dùng các đại lượng stationary: return trong/qua đêm, thay đổi
+khối lượng, biên độ, volatility 5/20 phiên, momentum 5/20 phiên, z-score khối
+lượng, return/momentum VN-Index và return tương đối. `Market stationary + News`
+bổ sung $(s_t,n_t)$. OHLCV mức tuyệt đối vẫn được giữ như cấu hình legacy.
 
 ## 3. Đồng bộ tin tức
 
@@ -53,7 +57,7 @@ Nếu $\mathcal N_t=\varnothing$, đặt $(s_t,n_t)=(0,0)$.
 ### Return
 
 $$
-y_t^{(r)}=r_{t+1}.
+y_{t,h}^{(r)}=\sum_{j=1}^{h}r_{t+j},\qquad h\in\{1,5\}.
 $$
 
 ### Volatility
@@ -62,7 +66,9 @@ $$
 y_t^{(\sigma)}=\sqrt{\frac{1}{H}\sum_{j=1}^{H}r_{t+j}^2}.
 $$
 
-Input là $X_t=[x_{t-W+1},\ldots,x_t]$. Ngày chia tập của return là $t+1$; ngày chia tập của volatility là $t+H$. Quy tắc này bảo đảm toàn bộ nhãn nằm trong đúng giai đoạn.
+Input là $X_t=[x_{t-W+1},\ldots,x_t]$. Ngày chia tập của return là $t+h$;
+ngày chia tập của volatility là $t+H$. Quy tắc này bảo đảm toàn bộ nhãn nằm
+trong đúng giai đoạn.
 
 ## 5. Chuẩn hóa
 
@@ -76,11 +82,14 @@ Target cũng được chuẩn hóa bằng mean/std train khi tối ưu và đả
 
 ## 6. Loss
 
-Cấu hình chính dùng MSE:
+Cấu hình return chính dùng Huber loss trên target đã chuẩn hóa:
 
 $$
-\mathcal L=\frac1N\sum_i(\hat y_i-y_i)^2.
+\mathcal L_{Huber}=\frac1N\sum_i
+\begin{cases}\frac12 e_i^2,&|e_i|\le1,\\|e_i|-\frac12,&|e_i|>1.\end{cases}
 $$
+
+Volatility dùng MSE. Cả hai mạng dùng AdamW với weight decay $10^{-4}$.
 
 Độ nhạy tail loss dùng ngưỡng phân vị 90% chỉ tính từ train:
 
@@ -104,6 +113,21 @@ Zero-return chỉ cho bài toán return:
 
 $$
 \hat y_t=0.
+$$
+
+Ridge trải phẳng cùng cửa sổ đầu vào; alpha thuộc
+$\{1,10,100,10^3,10^4,10^5\}$ và được chọn chỉ bằng MSE validation. Với
+volatility, Ridge học trên $\log(\max(y,\epsilon))$ rồi lấy hàm mũ để dự báo
+luôn dương.
+
+Với mạng, hệ số co dự báo được ước lượng chỉ trên validation:
+
+$$
+\alpha^*=\operatorname{clip}_{[0,1]}
+\frac{(\hat y^{val}-\bar y_{train})^\top(y^{val}-\bar y_{train})}
+{\|\hat y^{val}-\bar y_{train}\|_2^2},
+\qquad
+\hat y^{shrunk}=\bar y_{train}+\alpha^*(\hat y-\bar y_{train}).
 $$
 
 LSTM và Selective SSM nhận tensor `[batch, W, features]`, dùng trạng thái cuối để hồi quy một giá trị. Selective SSM triển khai truy hồi chọn lọc:
@@ -184,7 +208,9 @@ $\bar d>0$ có lợi cho mô hình. Sai số chuẩn dùng Newey–West/HAC; v�
 
 | Target | Baseline | Mạng | Feature |
 |---|---|---|---|
-| Return | Zero, Train Mean | LSTM, Mamba | Market-only, Market+News |
-| Volatility | Train Mean | LSTM, Mamba | Market-only, Market+News |
+| Return h1/h5 | Zero, Train Mean, Ridge | LSTM, Mamba | Market stationary, Market stationary + News |
+| Volatility h5 | Train Mean, log-Ridge | LSTM, Mamba | Market stationary, Market stationary + News |
 
-Mỗi mạng chạy 5 seed trên 8 mã. Hai ablation và sensitivity được báo cáo tách khỏi ma trận chính để tránh làm mờ giả thuyết chính.
+Mỗi mạng chạy 5 seed trên 8 mã. Toàn ma trận chính có 568 lượt chạy. Hai
+ablation legacy và sensitivity được báo cáo tách khỏi ma trận chính để tránh
+làm mờ giả thuyết chính.

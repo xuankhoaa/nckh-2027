@@ -9,6 +9,7 @@ DATA_START = "2020-01-01"
 # Mốc đóng băng dữ liệu của lần thực nghiệm chính. Không thay đổi mốc này khi tái lập kết quả.
 DATA_END = "2026-10-12"
 DEFAULT_WINDOW = 30
+DEFAULT_RETURN_HORIZON = 1
 DEFAULT_VOLATILITY_HORIZON = 5
 DEFAULT_NEWS_CUTOFF_HOUR = 15
 RESEARCH_SEEDS = (42, 52, 62, 72, 82)
@@ -28,6 +29,21 @@ BASE_FEATURES = (
 )
 VNINDEX_FEATURE = "vnindex_return"
 NEWS_FEATURES = ("sentiment_score", "news_count")
+STATIONARY_MARKET_FEATURES = (
+    "return",
+    "intraday_return",
+    "overnight_return",
+    "volume_change",
+    "high_low_range",
+    "historical_volatility_5d",
+    "historical_volatility_20d",
+    "momentum_5d",
+    "momentum_20d",
+    "volume_zscore_20d",
+    VNINDEX_FEATURE,
+    "vnindex_momentum_5d",
+    "relative_return",
+)
 
 TARGETS = ("return", "volatility")
 FEATURE_SETS = {
@@ -35,8 +51,10 @@ FEATURE_SETS = {
     "market_news": (*BASE_FEATURES, VNINDEX_FEATURE, *NEWS_FEATURES),
     "market_news_no_sentiment": (*BASE_FEATURES, VNINDEX_FEATURE, "news_count"),
     "market_news_no_count": (*BASE_FEATURES, VNINDEX_FEATURE, "sentiment_score"),
+    "market_stationary": STATIONARY_MARKET_FEATURES,
+    "market_stationary_news": (*STATIONARY_MARKET_FEATURES, *NEWS_FEATURES),
 }
-MAIN_FEATURE_SETS = ("market_only", "market_news")
+MAIN_FEATURE_SETS = ("market_stationary", "market_stationary_news")
 ABLATION_FEATURE_SETS = ("market_news_no_sentiment", "market_news_no_count")
 
 

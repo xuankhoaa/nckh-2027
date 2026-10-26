@@ -73,6 +73,38 @@ class PreprocessTests(unittest.TestCase):
                 pd.Timestamp(full.iloc[source_index + 5]["time"]),
             )
 
+    def test_five_day_return_is_sum_of_next_five_log_returns(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            self.make_data(directory)
+            frame = build_feature_frame("VCB", directory, return_horizon=5)
+            row = frame.iloc[10]
+            full = pd.read_csv(directory / "VCB.csv")
+            returns = np.log(full["close"] / full["close"].shift(1))
+            source_index = full.index[full["time"].eq(row["time"].strftime("%Y-%m-%d"))][0]
+            expected = returns.iloc[source_index + 1 : source_index + 6].sum()
+            self.assertAlmostEqual(row["target_return"], expected)
+            self.assertEqual(
+                row["target_return_date"],
+                pd.Timestamp(full.iloc[source_index + 5]["time"]),
+            )
+
+    def test_stationary_feature_set_has_no_missing_values_in_sequences(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            self.make_data(directory)
+            frame = build_feature_frame("VCB", directory)
+            split = TimeSplit(train_end="2023-03-15", validation_end="2023-04-10")
+            dataset = make_sequence_split(
+                frame,
+                window=10,
+                split=split,
+                feature_set="market_stationary",
+            )
+            self.assertTrue(np.isfinite(dataset.x_train).all())
+            self.assertIn("relative_return", dataset.feature_names)
+            self.assertNotIn("close", dataset.feature_names)
+
     def test_news_after_cutoff_and_weekend_move_to_next_trading_day(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)

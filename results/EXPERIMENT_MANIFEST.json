@@ -1,29 +1,31 @@
 {
-  "created_at_utc": "2026-10-25T15:55:31.178318+00:00",
-  "started_at_utc": "2026-10-25T15:36:38.426409+00:00",
-  "git_commit": "e41c75dee1a3fc3a1a6f2f91cb6a93dc368db586",
+  "created_at_utc": "2026-10-26T07:46:46.167036+00:00",
+  "started_at_utc": "2026-10-26T07:42:41.253040+00:00",
+  "git_commit": "b5486f6e4d3c68deb899d87ca41b0c2ceca80923",
   "git_worktree_dirty": true,
   "source_sha256": {
-    "config.py": "87bdba2e8ad05125c527e7b109f7ccc840b2350d8527f9a6141de7aa6bb2283a",
+    "config.py": "1ef713e4d06ea7723166e9e2bf9ab82edc1786a01501c1a00a207e67e6296bd5",
     "collect_news.py": "605222191ae8de974b384780379e57ca9b2ab737eda3e7f8d8931646d25679a8",
     "data_quality.py": "5abfec02a8fd894933b09774c003b09bdb82d3cf981f69b158be1fad6e72450a",
-    "preprocess.py": "fdb2d280ee4c4d1544e26a29ef5a94a7e0f69bd67022a5bd01e329f73b75615e",
-    "baselines.py": "364462617631936735d4f36a4013f62154f42927cfeefad196cbda5d5ca0dba6",
+    "preprocess.py": "f254d851bc0357b05d2071fb116b3933cfc2d714e86b34536c5bc1c0bca15d39",
+    "baselines.py": "3d4cb047375c63f99402514e7df4962f976aa77ded8d078a8d07035f805d8c9e",
     "models/lstm.py": "d6396f073742a892c574f1d83b6988173c4234b44692a85a60ce680d15f6b397",
     "models/mamba_model.py": "2fd50c247cb1d7e72e21115089d81ca9fc03029a8241a313010f8fe900b8fe72",
     "console.py": "2858e567fd24daad8ae4ff2064b0cc1d10ba6da6f0f743e58ea88f8cc2bf1269",
-    "train.py": "53ef7d9d5c4b6cf3208fb219c3197742438f1e3c6751e84fb404624c86f19a97",
-    "evaluate.py": "696adf124c66e2af522f5274099a4578078ef34321ad657c4eb90a24e0b6e8ee",
-    "run_experiments.py": "f758b229df2d2858d63b98db283620eed4a601268fd071a3e168967d8b4eebd3"
+    "train.py": "c9fe7ddc440ca03d7b1a371fe06dddc435e680dd7116decb14b30f58eceef672",
+    "evaluate.py": "ff5f7021882763ad28dd60505996253156dfe08989e235d6cf5fe329b3685560",
+    "run_experiments.py": "23d2c64419c4b2f294f322a92159cbbbdfb4d8b8bbb1f760256b7391ca308515",
+    "generate_report.py": "8de9163c2553139819149c1c0172ee400ce9af1f79f1a1d852a59ce3eb3a0da6",
+    "verify_project.py": "9da9dee0eaec04f1263f818c806fd78dfe5991b8060676801bfb1cb0ad0f60e6"
   },
   "python": "3.13.13",
   "platform": "Windows-11-10.0.26300-SP0",
   "packages": {
-    "torch": "2.14.0",
-    "pandas": "2.3.3",
-    "numpy": "2.2.6",
-    "scikit-learn": "1.7.2",
-    "vnstock": "4.0.8"
+    "torch": "2.14.0+cpu",
+    "pandas": "3.0.3",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.0",
+    "vnstock": null
   },
   "cuda_available": false,
   "cuda_device": null,
@@ -54,8 +56,12 @@
       "volatility"
     ],
     "feature_sets": [
-      "market_only",
-      "market_news"
+      "market_stationary",
+      "market_stationary_news"
+    ],
+    "return_horizons": [
+      1,
+      5
     ],
     "volatility_horizon": 5,
     "news_cutoff_hours": [
@@ -64,11 +70,25 @@
     "tail_weights": [
       1.0
     ],
+    "return_loss": "huber",
+    "volatility_loss": "mse",
+    "weight_decay": 0.0001,
+    "validation_shrinkage": true,
+    "ridge_alphas": [
+      1.0,
+      10.0,
+      100.0,
+      1000.0,
+      10000.0,
+      100000.0
+    ],
+    "include_ridge": true,
     "epochs": 40,
     "batch_size": 128,
     "models": [
       "naive_zero",
       "train_mean",
+      "ridge",
       "lstm",
       "mamba"
     ]
@@ -81,7 +101,7 @@
     "collection_manifest_sha256": "3523f5b5d95912fe63d4eb75c529aa744c94b49f6d738a10bcf14a22c5063b4c"
   },
   "data_manifest": {
-    "created_at_utc": "2026-10-25T15:55:31.164556+00:00",
+    "created_at_utc": "2026-10-26T07:46:46.158501+00:00",
     "source": "KBS",
     "files": [
       {
