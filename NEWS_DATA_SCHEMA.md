@@ -34,9 +34,10 @@ Các tệp được tạo trong `data/`:
 | `NEWS_MANIFEST.json` | truy vấn, số yêu cầu, độ phủ, thời điểm lấy, checksum |
 | `news_validation_sample.csv` | mẫu phân tầng để gán nhãn thủ công |
 
-`data/` bị loại khỏi Git để tránh phát hành lại dữ liệu nguồn. Khi tái lập chính
-xác, nhóm giữ snapshot và manifest trong kho lưu trữ nội bộ; GitHub chứa mã và
-quy trình tạo lại.
+Snapshot và manifest hiện được lưu trong repository để tái lập đúng lần chạy đã
+công bố. Các bản ghi chỉ chứa metadata, tiêu đề và liên kết, không chứa toàn văn.
+Quyền đối với tiêu đề, bài viết và metadata gốc vẫn thuộc các nhà cung cấp/nhà
+xuất bản tương ứng; việc sử dụng lại phải tuân thủ điều khoản của nguồn.
 
 ## Schema dùng cho mô hình
 

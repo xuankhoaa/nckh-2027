@@ -2,7 +2,6 @@
 AGENTS.md
 __pycache__/
 *.py[cod]
-data/
 checkpoints/
 
 # Chỉ lưu các kết quả tổng hợp cần cho báo cáo. Dữ liệu dự báo theo ngày và

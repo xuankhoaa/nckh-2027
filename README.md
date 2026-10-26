@@ -257,7 +257,16 @@ Hướng dẫn chi tiết được cung cấp tại [HUONG_DAN_A_Z.md](HUONG_DAN
 - `results/EXPERIMENT_MANIFEST.json`: cấu hình, môi trường và checksum;
 - `results/bieu_do/tong_hop/`: biểu đồ cấp nhóm.
 
-`data/`, dự báo theo từng ngày và biểu đồ từng seed không được đưa lên Git để tránh phát hành lại dữ liệu nguồn và giữ repository gọn. Các tệp này có thể tái tạo bằng mã nguồn cùng snapshot nội bộ.
+Thư mục `data/` được lưu trong repository để người đọc có thể tái lập chính xác
+lần thực nghiệm đã công bố. Dữ liệu bao gồm OHLCV, VN-Index, metadata/tiêu đề
+tin, điểm sentiment và các manifest checksum. Việc đưa snapshot vào kho mã
+không chuyển giao quyền sở hữu đối với dữ liệu của bên thứ ba; người sử dụng
+phải tuân thủ điều khoản của nguồn KBS/Vnstock, Google News và nhà xuất bản gốc.
+Xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Dự báo theo từng ngày và biểu đồ từng seed vẫn không được commit vì có thể tái
+tạo từ snapshot, trong khi các bảng tổng hợp cần cho báo cáo được lưu tại
+`results/`.
 
 ## 12. Hạn chế và hướng phát triển
 

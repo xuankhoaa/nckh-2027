@@ -1,0 +1,147 @@
+{
+  "created_at": "2026-10-25T11:32:37.369664+00:00",
+  "provider": "Google News RSS",
+  "content_policy": "Chỉ lưu metadata, tiêu đề và liên kết; không lưu toàn văn.",
+  "period": {
+    "start": "2020-01-01",
+    "end": "2026-10-12"
+  },
+  "queries": {
+    "VCB": "(Vietcombank OR \"Ngân hàng Ngoại thương\")",
+    "BID": "(BIDV OR \"Ngân hàng Đầu tư và Phát triển\")",
+    "CTG": "(VietinBank OR \"Ngân hàng Công thương\")",
+    "MBB": "(\"MB Bank\" OR MBBank OR \"Ngân hàng Quân đội\")",
+    "TCB": "Techcombank",
+    "ACB": "\"Ngân hàng ACB\"",
+    "VPB": "VPBank",
+    "STB": "Sacombank"
+  },
+  "sentiment_method": "vi_finance_lexicon_v1_title",
+  "minimum_articles_per_ticker_per_split": 20,
+  "coverage": [
+    {
+      "ticker": "VCB",
+      "train": 677,
+      "validation": 357,
+      "test": 1315
+    },
+    {
+      "ticker": "BID",
+      "train": 520,
+      "validation": 241,
+      "test": 1061
+    },
+    {
+      "ticker": "CTG",
+      "train": 907,
+      "validation": 556,
+      "test": 1499
+    },
+    {
+      "ticker": "MBB",
+      "train": 203,
+      "validation": 102,
+      "test": 249
+    },
+    {
+      "ticker": "TCB",
+      "train": 532,
+      "validation": 278,
+      "test": 1140
+    },
+    {
+      "ticker": "ACB",
+      "train": 169,
+      "validation": 82,
+      "test": 296
+    },
+    {
+      "ticker": "VPB",
+      "train": 761,
+      "validation": 319,
+      "test": 1223
+    },
+    {
+      "ticker": "STB",
+      "train": 343,
+      "validation": 203,
+      "test": 1057
+    }
+  ],
+  "fetch_stats": [
+    {
+      "ticker": "VCB",
+      "request_count": 86,
+      "saturated_intervals": 2,
+      "article_count": 2349,
+      "first_published_at": "2020-01-01T08:00:00+00:00",
+      "last_published_at": "2026-10-12T10:33:00+00:00"
+    },
+    {
+      "ticker": "BID",
+      "request_count": 86,
+      "saturated_intervals": 2,
+      "article_count": 1822,
+      "first_published_at": "2020-01-01T08:00:00+00:00",
+      "last_published_at": "2026-10-12T10:30:00+00:00"
+    },
+    {
+      "ticker": "CTG",
+      "request_count": 90,
+      "saturated_intervals": 4,
+      "article_count": 2962,
+      "first_published_at": "2020-01-01T08:00:00+00:00",
+      "last_published_at": "2026-10-12T07:00:00+00:00"
+    },
+    {
+      "ticker": "MBB",
+      "request_count": 82,
+      "saturated_intervals": 0,
+      "article_count": 554,
+      "first_published_at": "2020-01-01T08:00:00+00:00",
+      "last_published_at": "2026-10-10T07:00:00+00:00"
+    },
+    {
+      "ticker": "TCB",
+      "request_count": 90,
+      "saturated_intervals": 4,
+      "article_count": 1950,
+      "first_published_at": "2020-01-08T08:00:00+00:00",
+      "last_published_at": "2026-10-12T07:00:00+00:00"
+    },
+    {
+      "ticker": "ACB",
+      "request_count": 82,
+      "saturated_intervals": 0,
+      "article_count": 547,
+      "first_published_at": "2020-01-13T08:00:00+00:00",
+      "last_published_at": "2026-10-11T07:00:00+00:00"
+    },
+    {
+      "ticker": "VPB",
+      "request_count": 86,
+      "saturated_intervals": 2,
+      "article_count": 2303,
+      "first_published_at": "2020-01-02T08:00:00+00:00",
+      "last_published_at": "2026-10-12T07:00:00+00:00"
+    },
+    {
+      "ticker": "STB",
+      "request_count": 88,
+      "saturated_intervals": 3,
+      "article_count": 1603,
+      "first_published_at": "2020-01-09T08:00:00+00:00",
+      "last_published_at": "2026-10-12T07:00:00+00:00"
+    }
+  ],
+  "files": {
+    "data\\news_raw.csv": {
+      "rows": 14090,
+      "sha256": "3d18943538bcd8dfaab985d9f972eb1f57889da1b284148d3a0e392088750adc"
+    },
+    "data\\news.csv": {
+      "rows": 14090,
+      "sha256": "2dc2624854da675ebf730251d748ac9b3f9e42fcc19c0571ae22e47f22820e5c"
+    }
+  }
+}

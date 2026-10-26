@@ -1,0 +1,72 @@
+{
+  "created_at_utc": "2026-10-26T07:46:46.158501+00:00",
+  "source": "KBS",
+  "files": [
+    {
+      "symbol": "VCB",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "24a82b7d447706b37d1a03a70839fb1f023e8a97218c1c5b3c362eecc492c228"
+    },
+    {
+      "symbol": "BID",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "4cec01186a15b03d555974cd7760865dfcbed8ba0ed9172e6a18bbea7113b8e6"
+    },
+    {
+      "symbol": "CTG",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "331e0b618b1ec7f77bf3606bcec6484a659720fb7961d21f044fe8769575e60a"
+    },
+    {
+      "symbol": "MBB",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "a74a7973ad50a5edb38cde5264d5ce775ef450b97742d8627b914b2a43de5881"
+    },
+    {
+      "symbol": "TCB",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "4b69996338fb574b683151d33f27b40b4e2613678092d9089c22e50c302cf7e3"
+    },
+    {
+      "symbol": "ACB",
+      "rows": 1684,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "e7f1cfa503f1c0728b68d44419f228cd0c617e601d965b58d616c59a364df529"
+    },
+    {
+      "symbol": "VPB",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "124768e13e0219beea7ef6f01025b8ec76449400b2bad3a44a4792f643a15bf1"
+    },
+    {
+      "symbol": "STB",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "ab16764240f778585b32a57c230685a55e9051894b06dd565d9358d781a11bf6"
+    },
+    {
+      "symbol": "VNINDEX",
+      "rows": 1689,
+      "start": "2020-01-02",
+      "end": "2026-10-12",
+      "sha256": "b83954843a0b54a35d9ebd08e673511b1b3ff26a6edf1a85d6e6400d22825157"
+    }
+  ],
+  "quality_warnings": [
+    "VNINDEX: 3 dòng close nằm ngoài [low, high] từ nguồn dữ liệu; pipeline chỉ dùng close để tính vnindex_return và không tự sửa dữ liệu."
+  ]
+}

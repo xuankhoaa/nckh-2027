@@ -98,7 +98,10 @@ Google News RSS được sử dụng như công cụ truy hồi metadata. Truy v
 | STB | 343 | 203 | 1.057 | 1.603 |
 | **Tổng** | **4.112** | **2.138** | **7.840** | **14.090** |
 
-Dự án chỉ lưu metadata, tiêu đề và liên kết, không lưu toàn văn bài báo. Snapshot dữ liệu không được đưa lên Git; checksum được lưu trong manifest để kiểm tra tính nhất quán.
+Dự án chỉ lưu metadata, tiêu đề và liên kết, không lưu toàn văn bài báo. Snapshot
+dữ liệu được lưu cùng repository để tái lập lần thực nghiệm; checksum trong
+manifest dùng để kiểm tra tính nhất quán. Quyền đối với dữ liệu gốc vẫn thuộc
+nhà cung cấp và nhà xuất bản tương ứng.
 
 ### 4.3 Đồng bộ thời gian
 

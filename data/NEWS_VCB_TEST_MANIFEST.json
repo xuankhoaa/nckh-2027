@@ -1,0 +1,42 @@
+{
+  "created_at": "2026-10-25T11:18:39.155391+00:00",
+  "provider": "Google News RSS",
+  "content_policy": "Chỉ lưu metadata, tiêu đề và liên kết; không lưu toàn văn.",
+  "period": {
+    "start": "2020-01-01",
+    "end": "2026-10-12"
+  },
+  "queries": {
+    "VCB": "(Vietcombank OR \"Ngân hàng Ngoại thương\")"
+  },
+  "sentiment_method": "vi_finance_lexicon_v1_title",
+  "minimum_articles_per_ticker_per_split": 10,
+  "coverage": [
+    {
+      "ticker": "VCB",
+      "train": 1517,
+      "validation": 506,
+      "test": 1664
+    }
+  ],
+  "fetch_stats": [
+    {
+      "ticker": "VCB",
+      "request_count": 86,
+      "saturated_intervals": 2,
+      "article_count": 3687,
+      "first_published_at": "2020-01-01T08:00:00+00:00",
+      "last_published_at": "2026-10-12T10:33:00+00:00"
+    }
+  ],
+  "files": {
+    "data\\news_vcb_raw_test.csv": {
+      "rows": 3687,
+      "sha256": "dd220da5dd6c83482052c1461a871e72c217cb76ca06b762d2412ad229adbc71"
+    },
+    "data\\news_vcb_test.csv": {
+      "rows": 3687,
+      "sha256": "ff3f65de5d7533406fb31d5275c894a7efd9bf2a98270ec009e15f6da4a44649"
+    }
+  }
+}
