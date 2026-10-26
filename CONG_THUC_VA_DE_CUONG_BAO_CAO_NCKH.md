@@ -1,4 +1,4 @@
-# Công thức và đề cương phương pháp
+# Đặc tả phương pháp và công thức nghiên cứu
 
 ## 1. Ký hiệu
 

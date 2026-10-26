@@ -7,6 +7,22 @@
 
 Đối tượng gồm `VCB`, `BID`, `CTG`, `MBB`, `TCB`, `ACB`, `VPB`, `STB`. Đây là pipeline nghiên cứu có thể tái lập, không phải công cụ tư vấn đầu tư.
 
+| Hạng mục | Trạng thái |
+|---|---|
+| Ma trận thực nghiệm chính | Hoàn thành 344 lượt chạy |
+| Hai bài toán đầu ra | Return 1 phiên và volatility 5 phiên |
+| Dữ liệu đầu vào | Thị trường và 14.090 tiêu đề tin đã lọc |
+| Kiểm thử | 19/19 kiểm thử đạt |
+| Kết quả công bố | Bảng tổng hợp, kiểm định, manifest và biểu đồ đã lưu trong `results/` |
+
+Tài liệu sử dụng và bàn giao:
+
+- [Hướng dẫn chạy từ A–Z](HUONG_DAN_A_Z.md)
+- [Đặc tả phương pháp và công thức](CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md)
+- [Quy chuẩn dữ liệu tin tức](NEWS_DATA_SCHEMA.md)
+- [Báo cáo nghiên cứu](bao_cao/BAO_CAO_NCKH.md)
+- [Báo cáo kết quả tự sinh](results/BAO_CAO_KET_QUA.md)
+
 ## Trả lời ngắn cho câu hỏi “ablation hay chỉ so sánh mô hình?”
 
 Cần **cả hai**, vì chúng trả lời hai câu hỏi khác nhau:
@@ -20,7 +36,7 @@ Cần **cả hai**, vì chúng trả lời hai câu hỏi khác nhau:
 
 Không thực hiện ablation embedding mã cổ phiếu ở thiết kế chính, vì mô hình hiện được huấn luyện riêng theo từng mã và không có ticker embedding. Chỉ nên kiểm tra thành phần này nếu chuyển sang một mô hình pooled/global dùng chung tám mã.
 
-## Thiết kế đã cài đặt
+## Phương pháp và thiết kế thực nghiệm
 
 ### Đầu vào
 
@@ -105,6 +121,12 @@ Sentiment hiện là một **NLP baseline từ điển tài chính tiếng Việ
 tiêu đề theo cùng một quy tắc cho toàn kỳ. Đây là lựa chọn minh bạch và vừa sức
 cho NCKH đại học, nhưng không được gọi là nhãn cảm xúc chuẩn. Trước khi chốt bài
 báo, nhóm cần gán nhãn thủ công mẫu do script sinh ra và báo cáo Accuracy/F1.
+
+### Biểu đồ kết quả chính
+
+![RMSE bài toán return](results/bieu_do/tong_hop/group_return_rmse_h1_w30.png)
+
+![RMSE bài toán volatility](results/bieu_do/tong_hop/group_volatility_rmse_h5_w30.png)
 
 ## Môi trường
 
@@ -192,6 +214,18 @@ Mỗi kết quả mang đủ định danh `target`, `horizon`, `window`, `featur
 - `results/KIEM_DINH_GIA_TRI_TIN_TUC_VI.csv`: kiểm định ghép cặp News với Market-only;
 - `results/BAO_CAO_KET_QUA.md`: diễn giải tự sinh;
 - `results/EXPERIMENT_MANIFEST.json`: commit, checksum, môi trường và cấu hình.
+
+### Phạm vi công bố trên GitHub
+
+| Được lưu trong Git | Chỉ lưu cục bộ và có thể tái tạo |
+|---|---|
+| Mã nguồn, kiểm thử và tài liệu | CSV giá và snapshot tin trong `data/` |
+| Metric theo từng lần chạy và bảng tổng hợp | `results/predictions.csv` và bảng dự báo theo ngày |
+| Kiểm định HAC, manifest và biểu đồ cấp nhóm | Checkpoint và biểu đồ của từng mã/seed |
+
+Cách phân chia này giữ kho mã gọn, tránh phát hành lại dữ liệu tổng hợp từ nguồn
+bên ngoài và vẫn bảo đảm kết quả công bố có thể kiểm tra bằng checksum cùng mã
+thu thập. Không có API key hoặc thông tin đăng nhập nào được đưa vào Git.
 
 ## Cấu trúc chính
 

@@ -140,11 +140,13 @@ Lưới sensitivity làm số lượt chạy tăng mạnh. Nên chạy ma trận
 & "$env:USERPROFILE\.venv\Scripts\python.exe" verify_project.py --require-results
 ```
 
-Nếu `results/` vẫn là pilot schema cũ, kiểm tra có `--require-results` sẽ yêu cầu chạy lại. Mặc định `run_experiments.py` chỉ xóa output tái tạo được, không xóa dữ liệu gốc.
+Tùy chọn `--require-results` yêu cầu đủ output theo schema hiện hành và đối chiếu
+checksum mã nguồn với manifest của lần chạy. Mặc định `run_experiments.py` chỉ
+xóa output có thể tái tạo, không xóa dữ liệu gốc.
 
 ## 10. Câu kết luận được phép viết
 
 - “Mamba vượt Train Mean” chỉ khi RMSE thấp hơn và ổn định qua mã/seed.
 - “News có ích” chỉ khi cùng mô hình, cùng seed, Market+News tốt hơn Market-only.
 - Nếu Mamba/LSTM kém Train Mean, báo cáo đó là kết quả âm; không xóa baseline hoặc chọn riêng seed đẹp.
-- Pilot OHLCV cũ không phải kết quả cuối của đề tài hai đầu ra đa nguồn.
+- Chỉ sử dụng các bảng có đủ định danh target, horizon, feature set, mã và seed; không trộn kết quả từ schema hoặc lần chạy khác.

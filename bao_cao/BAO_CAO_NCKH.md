@@ -1,4 +1,4 @@
-# Bản thảo báo cáo NCKH
+# Báo cáo nghiên cứu khoa học
 
 ## Tên đề tài
 
@@ -87,7 +87,7 @@ Với return, Train Mean vẫn tốt nhất theo RMSE 0,018918. LSTM Market+News
 
 Với volatility, Mamba Market-only đạt RMSE nhóm 0,009779, thấp hơn LSTM Market-only 0,009871 và Train Mean 0,010576. Mamba Market-only cũng tốt nhất theo $R^2_{OOS}$ nhóm (0,142239) và QLIKE (0,683595). Khi thêm news, RMSE tăng lên 0,009905 với Mamba và 0,010110 với LSTM; số cặp news tốt hơn chỉ là 18/40 và 14/40. Như vậy các feature tin hiện tại chưa tạo giá trị tăng thêm ổn định cho volatility, dù các mạng nói chung vẫn dự báo volatility tốt hơn Train Mean theo RMSE.
 
-## 8. Khung bảng kết quả cuối
+## 8. Bảng kết quả chính
 
 ### Bài toán return
 
@@ -116,6 +116,6 @@ Với volatility, Mamba Market-only đạt RMSE nhóm 0,009779, thấp hơn LSTM
 - Nếu kết quả khác nhau giữa các mã, phải nêu rõ tính không đồng nhất thay vì chỉ báo cáo trung bình nhóm.
 - Nếu $R^2_{OOS}<0$ hoặc RMSE cao hơn Train Mean, ghi nhận kết quả âm; không loại baseline hoặc chọn riêng seed thuận lợi.
 
-## 10. Trạng thái hoàn thiện
+## 10. Tính tái lập và giới hạn nghiên cứu
 
-Mã nguồn cho hai target, thu thập và đồng bộ tin theo cutoff, Market-only/Market+News, hai ablation, nhiều seed, sensitivity, metric và bảng tổng hợp đã được chuẩn bị. Ma trận chính đã hoàn thành và được xác minh. Snapshot tin được tạo cục bộ theo [NEWS_DATA_SCHEMA.md](../NEWS_DATA_SCHEMA.md). Kết quả news hiện được xem là kết quả của sentiment baseline; trước khi khóa bài báo, nhóm phải hoàn tất gán nhãn mẫu kiểm tra sentiment và lưu Accuracy/F1 vào phụ lục.
+Mã nguồn cho hai target, thu thập và đồng bộ tin theo cutoff, Market-only/Market+News, hai ablation, nhiều seed, sensitivity, metric và bảng tổng hợp đã hoàn thiện. Ma trận chính đã chạy đủ và được xác minh tự động. Snapshot tin được tạo cục bộ theo [NEWS_DATA_SCHEMA.md](../NEWS_DATA_SCHEMA.md). Kết quả news hiện được diễn giải trong phạm vi sentiment baseline; nhóm cần hoàn tất gán nhãn mẫu kiểm tra sentiment và lưu Accuracy/F1 vào phụ lục trước khi sử dụng kết quả này trong bài báo chính thức.
