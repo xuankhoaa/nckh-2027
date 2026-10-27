@@ -1,0 +1,175 @@
+{
+  "created_at_utc": "2026-10-26T07:46:46.167036+00:00",
+  "started_at_utc": "2026-10-26T07:42:41.253040+00:00",
+  "git_commit": "b5486f6e4d3c68deb899d87ca41b0c2ceca80923",
+  "git_worktree_dirty": true,
+  "source_sha256": {
+    "config.py": "1ef713e4d06ea7723166e9e2bf9ab82edc1786a01501c1a00a207e67e6296bd5",
+    "collect_news.py": "605222191ae8de974b384780379e57ca9b2ab737eda3e7f8d8931646d25679a8",
+    "data_quality.py": "5abfec02a8fd894933b09774c003b09bdb82d3cf981f69b158be1fad6e72450a",
+    "preprocess.py": "f254d851bc0357b05d2071fb116b3933cfc2d714e86b34536c5bc1c0bca15d39",
+    "baselines.py": "3d4cb047375c63f99402514e7df4962f976aa77ded8d078a8d07035f805d8c9e",
+    "models/lstm.py": "d6396f073742a892c574f1d83b6988173c4234b44692a85a60ce680d15f6b397",
+    "models/mamba_model.py": "2fd50c247cb1d7e72e21115089d81ca9fc03029a8241a313010f8fe900b8fe72",
+    "console.py": "2858e567fd24daad8ae4ff2064b0cc1d10ba6da6f0f743e58ea88f8cc2bf1269",
+    "train.py": "c9fe7ddc440ca03d7b1a371fe06dddc435e680dd7116decb14b30f58eceef672",
+    "evaluate.py": "ff5f7021882763ad28dd60505996253156dfe08989e235d6cf5fe329b3685560",
+    "run_experiments.py": "23d2c64419c4b2f294f322a92159cbbbdfb4d8b8bbb1f760256b7391ca308515",
+    "generate_report.py": "8de9163c2553139819149c1c0172ee400ce9af1f79f1a1d852a59ce3eb3a0da6",
+    "verify_project.py": "9da9dee0eaec04f1263f818c806fd78dfe5991b8060676801bfb1cb0ad0f60e6"
+  },
+  "python": "3.13.13",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "packages": {
+    "torch": "2.14.0+cpu",
+    "pandas": "3.0.3",
+    "numpy": "2.4.4",
+    "scikit-learn": "1.9.0",
+    "vnstock": null
+  },
+  "cuda_available": false,
+  "cuda_device": null,
+  "data_access": "CSV cache cục bộ; Vnstock không được import trong lần huấn luyện này.",
+  "experiment": {
+    "tickers": [
+      "VCB",
+      "BID",
+      "CTG",
+      "MBB",
+      "TCB",
+      "ACB",
+      "VPB",
+      "STB"
+    ],
+    "seeds": [
+      42,
+      52,
+      62,
+      72,
+      82
+    ],
+    "windows": [
+      30
+    ],
+    "targets": [
+      "return",
+      "volatility"
+    ],
+    "feature_sets": [
+      "market_stationary",
+      "market_stationary_news"
+    ],
+    "return_horizons": [
+      1,
+      5
+    ],
+    "volatility_horizon": 5,
+    "news_cutoff_hours": [
+      15
+    ],
+    "tail_weights": [
+      1.0
+    ],
+    "return_loss": "huber",
+    "volatility_loss": "mse",
+    "weight_decay": 0.0001,
+    "validation_shrinkage": true,
+    "ridge_alphas": [
+      1.0,
+      10.0,
+      100.0,
+      1000.0,
+      10000.0,
+      100000.0
+    ],
+    "include_ridge": true,
+    "epochs": 40,
+    "batch_size": 128,
+    "models": [
+      "naive_zero",
+      "train_mean",
+      "ridge",
+      "lstm",
+      "mamba"
+    ]
+  },
+  "news_data": {
+    "path": "data\\news.csv",
+    "exists": true,
+    "sha256": "2dc2624854da675ebf730251d748ac9b3f9e42fcc19c0571ae22e47f22820e5c",
+    "collection_manifest_path": "data\\NEWS_MANIFEST.json",
+    "collection_manifest_sha256": "3523f5b5d95912fe63d4eb75c529aa744c94b49f6d738a10bcf14a22c5063b4c"
+  },
+  "data_manifest": {
+    "created_at_utc": "2026-10-26T07:46:46.158501+00:00",
+    "source": "KBS",
+    "files": [
+      {
+        "symbol": "VCB",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "24a82b7d447706b37d1a03a70839fb1f023e8a97218c1c5b3c362eecc492c228"
+      },
+      {
+        "symbol": "BID",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "4cec01186a15b03d555974cd7760865dfcbed8ba0ed9172e6a18bbea7113b8e6"
+      },
+      {
+        "symbol": "CTG",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "331e0b618b1ec7f77bf3606bcec6484a659720fb7961d21f044fe8769575e60a"
+      },
+      {
+        "symbol": "MBB",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "a74a7973ad50a5edb38cde5264d5ce775ef450b97742d8627b914b2a43de5881"
+      },
+      {
+        "symbol": "TCB",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "4b69996338fb574b683151d33f27b40b4e2613678092d9089c22e50c302cf7e3"
+      },
+      {
+        "symbol": "ACB",
+        "rows": 1684,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "e7f1cfa503f1c0728b68d44419f228cd0c617e601d965b58d616c59a364df529"
+      },
+      {
+        "symbol": "VPB",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "124768e13e0219beea7ef6f01025b8ec76449400b2bad3a44a4792f643a15bf1"
+      },
+      {
+        "symbol": "STB",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "ab16764240f778585b32a57c230685a55e9051894b06dd565d9358d781a11bf6"
+      },
+      {
+        "symbol": "VNINDEX",
+        "rows": 1689,
+        "start": "2020-01-02",
+        "end": "2026-10-12",
+        "sha256": "b83954843a0b54a35d9ebd08e673511b1b3ff26a6edf1a85d6e6400d22825157"
+      }
+    ],
+    "quality_warnings": [
+      "VNINDEX: 3 dòng close nằm ngoài [low, high] từ nguồn dữ liệu; pipeline chỉ dùng close để tính vnindex_return và không tự sửa dữ liệu."
+    ]
+  }
+}

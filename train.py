@@ -53,7 +53,7 @@ class Experiment:
     window: int = DEFAULT_WINDOW
     return_horizon: int = DEFAULT_RETURN_HORIZON
     volatility_horizon: int = DEFAULT_VOLATILITY_HORIZON
-    news_path: str = "data/news.csv"
+    news_path: str = "data/news_phobert.csv"
     news_cutoff_hour: int = DEFAULT_NEWS_CUTOFF_HOUR
     tail_weight: float = 1.0
     loss_name: str = "huber"
@@ -364,7 +364,7 @@ def parse_args() -> Experiment:
     parser.add_argument("--window", type=int, default=DEFAULT_WINDOW)
     parser.add_argument("--return-horizon", type=int, default=DEFAULT_RETURN_HORIZON)
     parser.add_argument("--volatility-horizon", type=int, default=DEFAULT_VOLATILITY_HORIZON)
-    parser.add_argument("--news-path", default="data/news.csv")
+    parser.add_argument("--news-path", default="data/news_phobert.csv")
     parser.add_argument("--news-cutoff-hour", type=int, default=DEFAULT_NEWS_CUTOFF_HOUR)
     parser.add_argument("--tail-weight", type=float, default=1.0)
     parser.add_argument("--loss-name", choices=LOSS_NAMES, default="huber")

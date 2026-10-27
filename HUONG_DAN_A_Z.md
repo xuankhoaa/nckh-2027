@@ -19,39 +19,31 @@ mã, nên không thực hiện ablation đó.
 
 ## 2. Môi trường
 
-Kho dùng Vnstock 4.x trong môi trường riêng. Không cài Vnstock 5.x đè lên môi trường này.
-
-Kết quả hiện tại được tạo bằng môi trường `%USERPROFILE%\.venv`. Trên máy mới,
-kiểm tra môi trường trước khi cài để không ghi đè một thế hệ Vnstock khác:
+Kết quả hiện tại được tạo bằng môi trường `%USERPROFILE%\.venv`. Snapshot dữ
+liệu đã được công bố cùng kho nên môi trường huấn luyện không cần Vnstock hay
+API key:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip show vnstock vnstock_data vnai
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -r requirements.txt
 ```
 
 Không gửi API key qua chat và không commit `.env`.
 
 ## 3. Dữ liệu thị trường
 
-```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
-```
-
-Mỗi CSV cần `time,open,high,low,close,volume`. Pipeline kiểm tra thiếu cột, trùng ngày, giá trị không hữu hạn, quy tắc OHLC và checksum.
+Các CSV OHLCV và VN-Index đã có trong `data/`. Mỗi CSV cần
+`time,open,high,low,close,volume`. Pipeline kiểm tra thiếu cột, trùng ngày, giá
+trị không hữu hạn, quy tắc OHLC và checksum. Code truy xuất dữ liệu nguồn không
+được phân phối trong kho nghiên cứu này.
 
 ## 4. Dữ liệu tin tức
 
-Tạo snapshot từ Google News RSS bằng tên đầy đủ của tám ngân hàng:
-
-```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" collect_news.py
-```
-
-Script quét theo tháng, tự chia nhỏ khoảng chạm giới hạn kết quả, bắt buộc tên
-ngân hàng xuất hiện trong tiêu đề, loại trùng và tạo:
+Snapshot đã được tạo từ Google News RSS bằng tên đầy đủ của tám ngân hàng, lọc
+thực thể trong tiêu đề và loại trùng. Kho công bố các tệp:
 
 - `data/news_raw.csv`: metadata tin đã chuẩn hóa;
-- `data/news.csv`: thêm điểm sentiment và nhãn;
+- `data/news.csv`: thêm điểm sentiment từ điển và nhãn;
+- `data/news_phobert.csv`: thêm xác suất và điểm sentiment PhoBERT;
 - `data/NEWS_MANIFEST.json`: truy vấn, độ phủ, ngày lấy và checksum;
 - `data/news_validation_sample.csv`: mẫu để nhóm kiểm tra thủ công.
 
@@ -60,6 +52,17 @@ Ba cột tối thiểu mà mô hình sử dụng là:
 ```text
 published_at,ticker,sentiment_score
 ```
+
+Huấn luyện và áp dụng PhoBERT:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py train
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score
+```
+
+`data/news_phobert.csv` là đầu vào mặc định của lệnh huấn luyện hiện tại. Kết
+quả đối chứng dùng từ điển được giữ trong `results/lexicon/`; bảng so sánh được
+tạo bằng `compare_sentiment_methods.py`.
 
 Tin sau cutoff 15:00 và tin cuối tuần được chuyển sang phiên kế tiếp. Dòng không
 có tin nhận `sentiment_score=0` và `news_count=0`. Mỗi mã phải có ít nhất 20 bài
@@ -72,9 +75,10 @@ quả cũ.
 & "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py
 ```
 
-Ghi Accuracy, macro-F1 và ma trận nhầm lẫn vào phụ lục. Nếu chất lượng thấp, sửa
-từ điển dựa trên lỗi trong train/validation; không dùng kết quả test dự báo để
-chọn lại từ điển. Chi tiết xem [NEWS_DATA_SCHEMA.md](NEWS_DATA_SCHEMA.md).
+Ghi Accuracy, macro-F1 và ma trận nhầm lẫn vào phụ lục cho cả từ điển và
+PhoBERT. Nếu chất lượng thấp, chỉ điều chỉnh bằng train/validation; không dùng
+kết quả test dự báo để chọn lại phương pháp. Chi tiết xem
+[NEWS_DATA_SCHEMA.md](NEWS_DATA_SCHEMA.md).
 
 ## 5. Target và leakage
 

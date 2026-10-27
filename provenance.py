@@ -21,8 +21,8 @@ from evaluate import RESULTS_DIR
 PROJECT_DIR = Path(__file__).resolve().parent
 SOURCE_FILES = (
     "config.py",
-    "collect_news.py",
     "data_quality.py",
+    "phobert_sentiment.py",
     "preprocess.py",
     "baselines.py",
     "models/lstm.py",
@@ -32,6 +32,7 @@ SOURCE_FILES = (
     "evaluate.py",
     "run_experiments.py",
     "generate_report.py",
+    "compare_sentiment_methods.py",
     "verify_project.py",
 )
 
@@ -100,10 +101,13 @@ def write_experiment_manifest(
         },
         "python": platform.python_version(),
         "platform": platform.platform(),
-        "packages": {name: _version(name) for name in ("torch", "pandas", "numpy", "scikit-learn", "vnstock")},
+        "packages": {
+            name: _version(name)
+            for name in ("torch", "pandas", "numpy", "scikit-learn", "transformers", "datasets", "underthesea")
+        },
         "cuda_available": torch.cuda.is_available(),
         "cuda_device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
-        "data_access": "CSV cache cục bộ; Vnstock không được import trong lần huấn luyện này.",
+        "data_access": "Snapshot CSV được công bố cùng repository; lần huấn luyện không gọi nguồn dữ liệu bên ngoài.",
         "experiment": {
             "tickers": list(tickers),
             "seeds": list(seeds),
@@ -151,7 +155,7 @@ def main() -> None:
         feature_sets=("market_only",),
         return_horizons=(1, 5),
         volatility_horizon=5,
-        news_path="data/news.csv",
+        news_path="data/news_phobert.csv",
         news_cutoff_hours=(15,),
         tail_weights=(1.0,),
         return_loss="huber",

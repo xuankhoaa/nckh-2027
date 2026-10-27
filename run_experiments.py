@@ -22,7 +22,7 @@ from config import (
     TICKERS,
 )
 from console import configure_utf8_output
-from collect_news import validate_news_coverage
+from data_quality import validate_news_coverage
 from evaluate import plot_group_metric_comparison, reset_generated_results
 from provenance import write_experiment_manifest
 from preprocess import aggregate_news_features
@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
         default=[1.0, 10.0, 100.0, 1_000.0, 10_000.0, 100_000.0],
     )
     parser.add_argument("--no-ridge", dest="include_ridge", action="store_false")
-    parser.add_argument("--news-path", default="data/news.csv")
+    parser.add_argument("--news-path", default="data/news_phobert.csv")
     parser.add_argument("--minimum-news-per-split", type=int, default=20)
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--batch-size", type=int, default=128)

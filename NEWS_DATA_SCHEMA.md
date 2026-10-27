@@ -2,10 +2,11 @@
 
 ## Nguồn mặc định
 
-Dự án dùng `collect_news.py` để truy hồi metadata tin lịch sử từ **Google News
-RSS**, theo tên thương hiệu của từng ngân hàng. Đây là công cụ tổng hợp; trường
-`source` và `source_url` cho biết nhà xuất bản gốc. Script chỉ lưu tiêu đề,
-nguồn, URL và thời điểm, không tải hoặc phát hành lại toàn văn bài báo.
+Snapshot metadata tin lịch sử được truy hồi từ **Google News RSS**, theo tên
+thương hiệu của từng ngân hàng. Đây là công cụ tổng hợp; trường `source` và
+`source_url` cho biết nhà xuất bản gốc. Dữ liệu chỉ lưu tiêu đề, nguồn, URL và
+thời điểm, không chứa toàn văn bài báo. Code truy xuất nguồn không thuộc phạm vi
+kho nghiên cứu; snapshot và manifest kiểm chứng đã được công bố trong `data/`.
 
 Lý do chọn phương án này:
 
@@ -19,11 +20,7 @@ giữa ngân hàng và giai đoạn không đồng đều; truy vấn có thể 
 bắt buộc tên/mã ngân hàng xuất hiện ngay trong tiêu đề, loại trùng và kiểm tra độ
 phủ riêng train/validation/test.
 
-## Tạo snapshot
-
-```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" collect_news.py
-```
+## Snapshot được công bố
 
 Các tệp được tạo trong `data/`:
 
@@ -31,6 +28,8 @@ Các tệp được tạo trong `data/`:
 |---|---|
 | `news_raw.csv` | metadata và tiêu đề sau lọc thực thể/loại trùng |
 | `news.csv` | dữ liệu trên cộng sentiment tự động |
+| `news_phobert.csv` | dữ liệu trên cộng xác suất và sentiment PhoBERT |
+| `NEWS_PHOBERT_MANIFEST.json` | checksum, phân bố nhãn, thống kê điểm và metric PhoBERT |
 | `NEWS_MANIFEST.json` | truy vấn, số yêu cầu, độ phủ, thời điểm lấy, checksum |
 | `news_validation_sample.csv` | mẫu phân tầng để gán nhãn thủ công |
 
@@ -55,6 +54,8 @@ Các cột truy xuất nguồn nên giữ: `title`, `source`, `source_url`, `url
 
 ## Cách chấm sentiment
 
+### Baseline từ điển
+
 Phiên bản mặc định `vi_finance_lexicon_v1_title` là một NLP baseline từ điển:
 
 1. chuẩn hóa Unicode và chữ thường;
@@ -67,6 +68,37 @@ Phiên bản mặc định `vi_finance_lexicon_v1_title` là một NLP baseline 
 chế là không hiểu đầy đủ ngữ cảnh. Vì vậy đây không phải “nhãn thật” và phải có
 kiểm tra thủ công.
 
+### PhoBERT
+
+`phobert_sentiment.py` fine-tune `vinai/phobert-base-v2` trên cấu hình
+`sentiment` của `undertheseanlp/UTS2017_Bank`. Train gốc được tách tiếp thành
+train/validation có phân tầng; test chính thức chỉ dùng đánh giá cuối. Hàm mất
+mát dùng trọng số lớp theo căn bậc hai nghịch đảo tần suất để hạn chế lệch lớp
+neutral mà không khuếch đại quá mức số ít mẫu neutral.
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py train
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score
+```
+
+Mỗi tiêu đề có thêm ba xác suất, nhãn có xác suất lớn nhất, confidence và:
+
+```text
+sentiment_score = P(positive) - P(negative)
+```
+
+UTS2017_Bank có 2.471 phản hồi khách hàng (1.977 train, 494 test), không có ngày
+và không phải tin thị trường. Bộ này chỉ dùng để học bộ phân loại cảm xúc; ngày,
+mã và tiêu đề dự báo vẫn lấy từ `news_raw.csv`. Đây là domain adaptation gần,
+không thay thế kiểm định trên tiêu đề chứng khoán.
+
+Checkpoint được chọn ở epoch 1 theo Macro-F1 validation. Trên test chính thức,
+Accuracy = 0,9453, Macro-F1 = 0,6342 và weighted-F1 = 0,9377. Mô hình dự đoán
+đúng 0/8 mẫu neutral; khi chấm snapshot tin, nhãn cứng gồm 11.784 positive,
+2.306 negative và 0 neutral. Do đó pipeline dự báo dùng điểm xác suất liên tục,
+không coi nhãn cứng là nhãn thật. Chi tiết nằm trong
+`results/phobert_sentiment_metrics.json`.
+
 Mở `data/news_validation_sample.csv`, đọc tiêu đề và điền `human_label` bằng
 `negative`, `neutral` hoặc `positive`. Sau đó chạy:
 
@@ -76,6 +108,16 @@ Mở `data/news_validation_sample.csv`, đọc tiêu đề và điền `human_la
 
 Báo cáo số mẫu, Accuracy, macro-F1 và confusion matrix. Nếu hai người gán nhãn,
 nên báo cáo thêm mức đồng thuận; khi bất đồng thì thảo luận để có nhãn cuối.
+
+Để kiểm định PhoBERT, chấm chính tệp mẫu rồi giữ nguyên cột `human_label`:
+
+```powershell
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score `
+  --input data/news_validation_sample.csv `
+  --output data/news_validation_sample_phobert.csv
+& "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py `
+  --sample data/news_validation_sample_phobert.csv
+```
 
 ## Đồng bộ chống leakage
 

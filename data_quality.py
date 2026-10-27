@@ -15,8 +15,53 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
+from config import TimeSplit
+
 
 REQUIRED_OHLCV = ("time", "open", "high", "low", "close", "volume")
+
+
+def validate_news_coverage(
+    frame: pd.DataFrame,
+    tickers: Iterable[str],
+    minimum_per_split: int = 20,
+) -> pd.DataFrame:
+    """Bắt buộc mỗi mã có đủ tin ở train, validation và test."""
+    split = TimeSplit()
+    news = frame.copy()
+    news["published_at"] = pd.to_datetime(news["published_at"], errors="raise", utc=True)
+    local_date = (
+        news["published_at"].dt.tz_convert("Asia/Ho_Chi_Minh").dt.tz_localize(None).dt.normalize()
+    )
+    news["split"] = pd.cut(
+        local_date,
+        bins=[
+            pd.Timestamp.min,
+            pd.Timestamp(split.train_end),
+            pd.Timestamp(split.validation_end),
+            pd.Timestamp.max,
+        ],
+        labels=["train", "validation", "test"],
+    )
+    ticker_list = list(tickers)
+    coverage = (
+        news.groupby(["ticker", "split"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+        .reindex(index=ticker_list, columns=["train", "validation", "test"], fill_value=0)
+        .astype(int)
+    )
+    insufficient = coverage.lt(minimum_per_split)
+    if insufficient.any().any():
+        details = [
+            f"{coverage.index[row]}/{coverage.columns[column]}={coverage.iloc[row, column]}"
+            for row, column in zip(*insufficient.to_numpy().nonzero())
+        ]
+        raise ValueError(
+            f"Dữ liệu tin chưa đạt tối thiểu {minimum_per_split} bài cho mỗi mã/mỗi tập: "
+            + ", ".join(details)
+        )
+    return coverage
 
 
 def validate_ohlcv(frame: pd.DataFrame, symbol: str) -> list[str]:

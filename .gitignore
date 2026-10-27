@@ -3,6 +3,13 @@ AGENTS.md
 __pycache__/
 *.py[cod]
 checkpoints/
+artifacts/
+
+# Công cụ lấy dữ liệu chỉ giữ cục bộ; repository công bố snapshot và code nghiên cứu.
+get_data.py
+collect_news.py
+tests/test_collect_news.py
+.local_tools/
 
 # Chỉ lưu các kết quả tổng hợp cần cho báo cáo. Dữ liệu dự báo theo ngày và
 # hàng trăm biểu đồ từng lần chạy được tái tạo bằng run_experiments.py.
@@ -20,6 +27,12 @@ results/*
 !results/per_ticker_summary_volatility_h5_w30.csv
 !results/statistical_tests.csv
 !results/news_value_tests.csv
+!results/phobert_sentiment_metrics.json
+!results/sentiment_method_comparison.csv
+!results/lexicon/
+!results/lexicon/*.csv
+!results/lexicon/*.json
+!results/lexicon/*.md
 !results/BANG_TONG_HOP_NHOM_VI.csv
 !results/BANG_KET_QUA_CHI_TIET_VI.csv
 !results/KIEM_DINH_HAC_VI.csv

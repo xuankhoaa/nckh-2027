@@ -165,7 +165,7 @@ def build_feature_frame(
     frame["relative_return"] = frame["return"] - frame[VNINDEX_FEATURE]
 
     if include_news:
-        resolved_news_path = Path(news_path) if news_path is not None else data_dir / "news.csv"
+        resolved_news_path = Path(news_path) if news_path is not None else data_dir / "news_phobert.csv"
         news_daily = aggregate_news_features(
             resolved_news_path,
             ticker,

@@ -1,35 +1,38 @@
 {
-  "created_at_utc": "2026-10-26T07:46:46.167036+00:00",
-  "started_at_utc": "2026-10-26T07:42:41.253040+00:00",
-  "git_commit": "b5486f6e4d3c68deb899d87ca41b0c2ceca80923",
+  "created_at_utc": "2026-10-27T13:59:56.025133+00:00",
+  "started_at_utc": "2026-10-27T13:59:54.959620+00:00",
+  "git_commit": "6592c4735763569aac3388401405712597e1f964",
   "git_worktree_dirty": true,
   "source_sha256": {
     "config.py": "1ef713e4d06ea7723166e9e2bf9ab82edc1786a01501c1a00a207e67e6296bd5",
-    "collect_news.py": "605222191ae8de974b384780379e57ca9b2ab737eda3e7f8d8931646d25679a8",
-    "data_quality.py": "5abfec02a8fd894933b09774c003b09bdb82d3cf981f69b158be1fad6e72450a",
-    "preprocess.py": "f254d851bc0357b05d2071fb116b3933cfc2d714e86b34536c5bc1c0bca15d39",
+    "data_quality.py": "3c43f00dd202fdd2de2278b043fbc14cc83c152817783777db59c80793b50fb4",
+    "phobert_sentiment.py": "db8682b5d0fb932889670a4934f8aaac2a8a5c123f9161745fa1131062c73ecf",
+    "preprocess.py": "405a41f354105dd2e79347e6cc0d9053d08a6bd308be37de694c56bdb167c768",
     "baselines.py": "3d4cb047375c63f99402514e7df4962f976aa77ded8d078a8d07035f805d8c9e",
     "models/lstm.py": "d6396f073742a892c574f1d83b6988173c4234b44692a85a60ce680d15f6b397",
     "models/mamba_model.py": "2fd50c247cb1d7e72e21115089d81ca9fc03029a8241a313010f8fe900b8fe72",
     "console.py": "2858e567fd24daad8ae4ff2064b0cc1d10ba6da6f0f743e58ea88f8cc2bf1269",
-    "train.py": "c9fe7ddc440ca03d7b1a371fe06dddc435e680dd7116decb14b30f58eceef672",
+    "train.py": "ea3418032d6851e370fa6ce8eca0e6021cdc5e7c5a528cf3293ec79d0b7897dc",
     "evaluate.py": "ff5f7021882763ad28dd60505996253156dfe08989e235d6cf5fe329b3685560",
-    "run_experiments.py": "23d2c64419c4b2f294f322a92159cbbbdfb4d8b8bbb1f760256b7391ca308515",
+    "run_experiments.py": "999e4702d5d3a37fe4a134508ff2a5dab3f8c2af2e5fdfccc8c973c57155041b",
     "generate_report.py": "8de9163c2553139819149c1c0172ee400ce9af1f79f1a1d852a59ce3eb3a0da6",
-    "verify_project.py": "9da9dee0eaec04f1263f818c806fd78dfe5991b8060676801bfb1cb0ad0f60e6"
+    "compare_sentiment_methods.py": "afe47ba8970d8a80ad1edcb7cb4f8f241540c01dc459c816795466cbb8248db4",
+    "verify_project.py": "e62c42938a4e3174d7713018c072964164d74a3676735ac3341c27f01fa74a5d"
   },
   "python": "3.13.13",
   "platform": "Windows-11-10.0.26300-SP0",
   "packages": {
-    "torch": "2.14.0+cpu",
-    "pandas": "3.0.3",
-    "numpy": "2.4.4",
-    "scikit-learn": "1.9.0",
-    "vnstock": null
+    "torch": "2.14.0",
+    "pandas": "2.3.3",
+    "numpy": "2.2.6",
+    "scikit-learn": "1.7.2",
+    "transformers": "4.56.2",
+    "datasets": "4.8.5",
+    "underthesea": "8.3.0"
   },
   "cuda_available": false,
   "cuda_device": null,
-  "data_access": "CSV cache cục bộ; Vnstock không được import trong lần huấn luyện này.",
+  "data_access": "Snapshot CSV được công bố cùng repository; lần huấn luyện không gọi nguồn dữ liệu bên ngoài.",
   "experiment": {
     "tickers": [
       "VCB",
@@ -94,14 +97,14 @@
     ]
   },
   "news_data": {
-    "path": "data\\news.csv",
+    "path": "data\\news_phobert.csv",
     "exists": true,
-    "sha256": "2dc2624854da675ebf730251d748ac9b3f9e42fcc19c0571ae22e47f22820e5c",
+    "sha256": "948b0a06e4e68aaa863946748576a76e9ce40e1470ce1c3c30478a933144a5aa",
     "collection_manifest_path": "data\\NEWS_MANIFEST.json",
     "collection_manifest_sha256": "3523f5b5d95912fe63d4eb75c529aa744c94b49f6d738a10bcf14a22c5063b4c"
   },
   "data_manifest": {
-    "created_at_utc": "2026-10-26T07:46:46.158501+00:00",
+    "created_at_utc": "2026-10-27T13:59:56.017935+00:00",
     "source": "KBS",
     "files": [
       {

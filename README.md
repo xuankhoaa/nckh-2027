@@ -66,14 +66,26 @@ Dữ liệu OHLCV và VN-Index được cache dưới dạng CSV. Cấu hình ch
 
 ### 3.2 Dữ liệu tin tức
 
-`collect_news.py` thu thập metadata từ Google News RSS theo tên từng ngân hàng. Dự án chỉ lưu tiêu đề, nguồn, URL và thời gian xuất bản; không tải hoặc phân phối lại toàn văn bài báo.
+Snapshot metadata tin được truy hồi từ Google News RSS theo tên từng ngân hàng. Dự án chỉ công bố tiêu đề, nguồn, URL và thời gian xuất bản; không tải hoặc phân phối lại toàn văn bài báo. Mã thu thập dữ liệu không thuộc phạm vi kho nghiên cứu này; snapshot, manifest và checksum cần thiết để tái lập thí nghiệm đã được lưu trong `data/`.
 
-Phiên bản hiện tại **không sử dụng PhoBERT**. Cảm xúc được xác định bằng baseline từ điển tài chính tiếng Việt `vi_finance_lexicon_v1_title`:
+Dự án triển khai hai bộ chấm cảm xúc để có đối chứng:
+
+- baseline từ điển tài chính tiếng Việt `vi_finance_lexicon_v1_title` trong `data/news.csv`;
+- PhoBERT (`vinai/phobert-base-v2`) fine-tune trên tập sentiment của `undertheseanlp/UTS2017_Bank`, sinh `data/news_phobert.csv`.
+
+Baseline từ điển thực hiện:
 
 1. chuẩn hóa Unicode và chữ thường;
 2. dò các cụm từ tài chính tích cực và tiêu cực;
 3. cộng trọng số;
 4. chuẩn hóa điểm về `[-1, 1]`.
+
+Với PhoBERT, đầu ra ba lớp được đổi thành điểm liên tục
+`P(positive) - P(negative)` trong `[-1,1]`. UTS2017_Bank gồm phản hồi dịch vụ
+ngân hàng chứ không phải tiêu đề chứng khoán, nên kết quả vẫn phải được kiểm
+định trên mẫu tiêu đề do nhóm gán nhãn. Ma trận chính trong `results/` đã được
+chạy bằng `data/news_phobert.csv`; kết quả từ điển trước đó được lưu riêng tại
+`results/lexicon/` để đối chứng.
 
 Hai đặc trưng tin tức được đưa vào mô hình là:
 
@@ -127,7 +139,7 @@ Kết quả được tổng hợp theo từng mã, trung bình và độ lệch 
 
 ## 7. Kết quả chính
 
-Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 26 kiểm thử tự động đều đạt.
+Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 25 kiểm thử tự động của kho công khai đều đạt.
 
 ### 7.1 Return một phiên
 
@@ -135,11 +147,11 @@ Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn b
 |---|---|---:|---:|---:|---:|
 | Train Mean | Không áp dụng | **0,018921** | 0,012921 | 0,000000 | 0,462415 |
 | LSTM | Market stationary | 0,018954 | 0,012962 | -0,003499 | 0,466629 |
-| LSTM | Market stationary + News | 0,018964 | 0,012967 | -0,004419 | 0,469476 |
+| LSTM | Market stationary + PhoBERT News | 0,018959 | 0,012971 | -0,003839 | 0,466059 |
 | Mamba-style | Market stationary | 0,018934 | 0,012939 | -0,001434 | 0,467084 |
-| Mamba-style | Market stationary + News | 0,018923 | 0,012929 | -0,000126 | 0,463952 |
+| Mamba-style | Market stationary + PhoBERT News | 0,018930 | 0,012934 | -0,000890 | 0,466002 |
 
-Mamba-style với tin tức tiến rất gần Train Mean nhưng chưa vượt baseline trên trung bình toàn nhóm. Vì vậy chưa có cơ sở kết luận mô hình dự báo được return một phiên tốt hơn dự báo hằng đơn giản.
+Mamba-style với PhoBERT tiến gần Train Mean nhưng chưa vượt baseline trên trung bình toàn nhóm. Vì vậy chưa có cơ sở kết luận mô hình dự báo được return một phiên tốt hơn dự báo hằng đơn giản.
 
 ### 7.2 Return năm phiên
 
@@ -147,9 +159,9 @@ Mamba-style với tin tức tiến rất gần Train Mean nhưng chưa vượt b
 |---|---|---:|---:|---:|---:|
 | Train Mean | Không áp dụng | **0,042155** | 0,029591 | 0,000000 | 0,520216 |
 | LSTM | Market stationary | 0,042368 | 0,029718 | -0,010051 | 0,516287 |
-| LSTM | Market stationary + News | 0,042251 | 0,029658 | -0,004272 | 0,524601 |
+| LSTM | Market stationary + PhoBERT News | 0,042259 | 0,029688 | -0,004518 | 0,522096 |
 | Mamba-style | Market stationary | 0,042262 | 0,029652 | -0,004833 | 0,520501 |
-| Mamba-style | Market stationary + News | 0,042208 | 0,029654 | -0,002362 | 0,517084 |
+| Mamba-style | Market stationary + PhoBERT News | 0,042209 | 0,029651 | -0,002417 | 0,518280 |
 
 Kéo dài horizon không làm xuất hiện năng lực dự báo vượt Train Mean trên trung bình nhóm. Đây là kết quả bổ sung, không thay thế bài toán return một phiên.
 
@@ -159,9 +171,9 @@ Kéo dài horizon không làm xuất hiện năng lực dự báo vượt Train 
 |---|---|---:|---:|---:|---:|
 | Train Mean | Không áp dụng | 0,010491 | 0,008567 | 0,000000 | 0,692076 |
 | LSTM | Market stationary | **0,009671** | 0,007276 | **0,147791** | **0,689216** |
-| LSTM | Market stationary + News | 0,009756 | **0,007197** | 0,132772 | 0,759970 |
+| LSTM | Market stationary + PhoBERT News | 0,009776 | **0,007209** | 0,129236 | 0,761927 |
 | Mamba-style | Market stationary | 0,009772 | 0,007333 | 0,128632 | 0,730341 |
-| Mamba-style | Market stationary + News | 0,009829 | 0,007278 | 0,118622 | 0,784686 |
+| Mamba-style | Market stationary + PhoBERT News | 0,009826 | 0,007293 | 0,119319 | 0,783877 |
 
 Volatility là bài toán có kết quả tích cực. LSTM Market stationary đạt RMSE thấp nhất và $R^2_{OOS}=0,147791$. Mamba-style cũng vượt Train Mean, nhưng không vượt LSTM ở cấu hình chính.
 
@@ -170,20 +182,24 @@ Volatility là bài toán có kết quả tích cực. LSTM Market stationary đ
 | Target | Mô hình | Số cặp news tốt hơn | Tổng số cặp |
 |---|---|---:|---:|
 | Return h1 | LSTM | 19 | 40 |
-| Return h1 | Mamba-style | 20 | 40 |
-| Return h5 | LSTM | 17 | 40 |
-| Return h5 | Mamba-style | 19 | 40 |
+| Return h1 | Mamba-style | 19 | 40 |
+| Return h5 | LSTM | 18 | 40 |
+| Return h5 | Mamba-style | 21 | 40 |
 | Volatility h5 | LSTM | 16 | 40 |
 | Volatility h5 | Mamba-style | 17 | 40 |
 
-Tin tức không tạo cải thiện ổn định trên đa số mã và seed. Kết quả này chỉ phản ánh snapshot và phương pháp sentiment từ điển hiện tại; nó không chứng minh tin tức nói chung không có giá trị dự báo.
+Tin tức không tạo cải thiện ổn định trên đa số mã và seed. PhoBERT cũng không
+thắng baseline từ điển một cách nhất quán: Mamba+PhoBERT tốt hơn Mamba+từ điển
+15/40 cặp ở return h1, 10/40 ở return h5 và 17/40 ở volatility. Kết quả này chỉ
+phản ánh snapshot và cách fine-tune hiện tại; nó không chứng minh tin tức nói
+chung không có giá trị dự báo.
 
 ## 8. Cấu trúc kho mã
 
 ```text
 config.py                  Cấu hình mã cổ phiếu, split, target và feature set
-get_data.py                Thu thập/cache dữ liệu thị trường
-collect_news.py            Thu thập, lọc và chấm sentiment tiêu đề tin
+phobert_sentiment.py       Fine-tune PhoBERT và chấm sentiment tiêu đề
+compare_sentiment_methods.py So sánh PhoBERT, từ điển và Market-only
 evaluate_sentiment.py      Đánh giá sentiment trên mẫu gán nhãn thủ công
 preprocess.py              Đồng bộ dữ liệu, tạo feature/target và chuỗi đầu vào
 baselines.py               Zero, Train Mean và Ridge
@@ -201,27 +217,36 @@ results/                   Kết quả tổng hợp được công bố
 
 ## 9. Cài đặt
 
-Dự án hiện sử dụng dòng Vnstock 4.x và Python từ môi trường `%USERPROFILE%\.venv`. Không cài Vnstock 5.x chồng lên cùng môi trường.
+Các snapshot dữ liệu đã có sẵn nên môi trường huấn luyện không cần Vnstock hoặc API key.
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip show vnstock vnstock_data vnai
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -U --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -r requirements.txt
 ```
-
-API key phải được lưu cục bộ theo hướng dẫn của nhà cung cấp, không ghi vào mã nguồn hoặc Git.
 
 ## 10. Chạy thực nghiệm
 
-### Chuẩn bị dữ liệu thị trường
+### Dữ liệu đầu vào
+
+Toàn bộ OHLCV, VN-Index, metadata tin, sentiment từ điển và sentiment PhoBERT
+đã nằm trong `data/`. Kho mã tập trung vào xử lý, mô hình hóa và đánh giá; code
+truy xuất dữ liệu nguồn không được phân phối trong repository.
+
+Fine-tune và chấm toàn bộ tiêu đề bằng PhoBERT:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" get_data.py --symbols VCB BID CTG MBB TCB ACB VPB STB
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py train
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score
 ```
 
-### Chuẩn bị dữ liệu tin tức
+Checkpoint được lưu tại `artifacts/phobert_sentiment/` và không commit vì dung
+lượng lớn. Metric sentiment được lưu tại
+`results/phobert_sentiment_metrics.json`. Máy chỉ có CPU vẫn chạy được nhưng sẽ
+chậm; nên dùng GPU trên Google Colab nếu có.
+
+Kiểm tra file đã chấm và tái tạo manifest:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" collect_news.py
+& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py audit
 ```
 
 ### Chạy ma trận chính
@@ -240,6 +265,7 @@ Tiếp tục một lần chạy bị gián đoạn:
 
 ```powershell
 & "$env:USERPROFILE\.venv\Scripts\python.exe" generate_report.py --window 30
+& "$env:USERPROFILE\.venv\Scripts\python.exe" compare_sentiment_methods.py
 & "$env:USERPROFILE\.venv\Scripts\python.exe" -m unittest discover -s tests -v
 & "$env:USERPROFILE\.venv\Scripts\python.exe" verify_project.py --require-results
 ```
@@ -253,6 +279,9 @@ Hướng dẫn chi tiết được cung cấp tại [HUONG_DAN_A_Z.md](HUONG_DAN
 - `results/group_summary.csv`: kết quả toàn nhóm;
 - `results/statistical_tests.csv`: kiểm định HAC so với Train Mean;
 - `results/news_value_tests.csv`: so sánh ghép cặp Market + News với Market-only;
+- `results/sentiment_method_comparison.csv`: so sánh PhoBERT với từ điển và Market-only;
+- `results/phobert_sentiment_metrics.json`: đánh giá PhoBERT trên UTS2017_Bank;
+- `results/lexicon/`: kết quả đối chứng dùng sentiment từ điển;
 - `results/BAO_CAO_KET_QUA.md`: báo cáo tự sinh từ kết quả;
 - `results/EXPERIMENT_MANIFEST.json`: cấu hình, môi trường và checksum;
 - `results/bieu_do/tong_hop/`: biểu đồ cấp nhóm.
@@ -270,12 +299,14 @@ tạo từ snapshot, trong khi các bảng tổng hợp cần cho báo cáo đư
 
 ## 12. Hạn chế và hướng phát triển
 
-- Sentiment hiện là baseline từ điển trên tiêu đề, chưa phải PhoBERT và chưa hiểu đầy đủ ngữ cảnh.
-- Chất lượng sentiment cần được xác nhận bằng mẫu gán nhãn thủ công với Accuracy và Macro-F1.
+- Kết quả dự báo chính đã dùng PhoBERT; kết quả từ điển được giữ làm đối chứng.
+- UTS2017_Bank là phản hồi khách hàng, lệch lớp neutral và khác miền tiêu đề chứng khoán.
+- PhoBERT đạt Accuracy 94,53% nhưng Macro-F1 63,42% và không dự đoán đúng mẫu neutral nào trên test UTS2017_Bank; Accuracy đơn lẻ vì vậy dễ gây hiểu nhầm.
+- Chất lượng cả từ điển và PhoBERT cần được xác nhận trên cùng mẫu gán nhãn thủ công bằng Accuracy và Macro-F1.
 - Snapshot Google News có thể thay đổi theo chỉ mục của nhà cung cấp.
 - Mamba-style là mô hình Selective SSM tối giản, không phải bản benchmark chính thức.
 - Return ngắn hạn vẫn chưa vượt Train Mean trên trung bình nhóm.
-- Các hướng mở rộng hợp lý gồm PhoBERT đã fine-tune trên dữ liệu tài chính Việt Nam, mô hình pooled nhiều mã, walk-forward validation và kiểm tra độ nhạy đã đăng ký trước.
+- Các hướng mở rộng hợp lý gồm bổ sung nhãn tiêu đề chứng khoán để thích nghi miền cho PhoBERT, mô hình pooled nhiều mã, walk-forward validation và kiểm tra độ nhạy đã đăng ký trước.
 
 ## 13. Tài liệu nghiên cứu
 

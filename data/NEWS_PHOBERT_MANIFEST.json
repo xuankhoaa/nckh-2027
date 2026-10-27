@@ -1,0 +1,53 @@
+{
+  "created_at_utc": "2026-10-27T14:00:02.839283+00:00",
+  "method": "phobert_base_v2_uts2017_bank_v1",
+  "rows": 14090,
+  "raw_rows": 14090,
+  "files": {
+    "data\\news_raw.csv": "3d18943538bcd8dfaab985d9f972eb1f57889da1b284148d3a0e392088750adc",
+    "data\\news_phobert.csv": "948b0a06e4e68aaa863946748576a76e9ce40e1470ce1c3c30478a933144a5aa",
+    "results\\phobert_sentiment_metrics.json": "3f626878b952cfc779253eb0760780e535f8f3bc7b0a814a0b3fe2623890999c"
+  },
+  "label_counts": {
+    "positive": 11784,
+    "negative": 2306
+  },
+  "score_summary": {
+    "count": 14090.0,
+    "mean": 0.6442318276700922,
+    "std": 0.6414085371140519,
+    "min": -0.9673955,
+    "25%": 0.86135584,
+    "50%": 0.9574415000000001,
+    "75%": 0.96707827,
+    "max": 0.97635645
+  },
+  "probability_sum_max_absolute_error": 1.5300000011375658e-07,
+  "uts2017_official_test": {
+    "accuracy": 0.9453441295546559,
+    "macro_f1": 0.6342258953168044,
+    "weighted_f1": 0.9376558369859804,
+    "confusion_matrix": [
+      [
+        290,
+        0,
+        11
+      ],
+      [
+        6,
+        0,
+        2
+      ],
+      [
+        8,
+        0,
+        177
+      ]
+    ]
+  },
+  "limitations": [
+    "UTS2017_Bank chủ yếu là phản hồi khách hàng, không phải tiêu đề chứng khoán.",
+    "Lớp neutral rất ít; Macro-F1 và kết quả từng lớp phải được báo cáo cùng Accuracy.",
+    "Cần kiểm định thêm trên mẫu tiêu đề tin do con người gán nhãn."
+  ]
+}

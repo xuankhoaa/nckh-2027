@@ -7,6 +7,7 @@ Các tài liệu học thuật được tham khảo:
 1. Gu, A., & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752. https://arxiv.org/abs/2312.00752
 2. Shi, Z. (2024). *MambaStock: Selective State Space Model for Stock Prediction*. arXiv:2402.18959. https://arxiv.org/abs/2402.18959
 3. Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory*. Neural Computation, 9(8), 1735–1780. https://doi.org/10.1162/neco.1997.9.8.1735
+4. Nguyen, D. Q., & Nguyen, A. T. (2020). *PhoBERT: Pre-trained language models for Vietnamese*. Findings of EMNLP 2020. https://aclanthology.org/2020.findings-emnlp.92/
 
 `MambaStock` được nêu như một tham khảo học thuật; mã nguồn repository đó không được vendoring vào dự án. Thư viện Python được cài đặt khi chạy dự án tuân theo license riêng của từng gói; xem thông tin của các gói trong môi trường cài đặt trước khi phân phối sản phẩm.
 
@@ -24,3 +25,11 @@ Việc đưa dữ liệu vào repository không chuyển giao quyền sở hữu
 giấy phép đối với nội dung của KBS, Vnstock, Google News hay các nhà xuất bản.
 Người sử dụng lại dữ liệu có trách nhiệm kiểm tra và tuân thủ điều khoản của
 từng nguồn.
+
+## Mô hình và dữ liệu NLP
+
+- `vinai/phobert-base-v2` là mô hình PhoBERT nền do VinAI công bố, giấy phép
+  AGPL-3.0: https://huggingface.co/vinai/phobert-base-v2
+- `undertheseanlp/UTS2017_Bank` là dữ liệu phản hồi ngân hàng tiếng Việt có
+  nhãn, giấy phép Apache-2.0: https://huggingface.co/datasets/undertheseanlp/UTS2017_Bank
+- Trọng số fine-tune cục bộ trong `artifacts/` không được commit vào repository.

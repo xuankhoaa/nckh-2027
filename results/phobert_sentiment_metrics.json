@@ -1,0 +1,113 @@
+{
+  "created_at_utc": "2026-10-27T13:23:52.953784+00:00",
+  "base_model": "vinai/phobert-base-v2",
+  "dataset": "undertheseanlp/UTS2017_Bank",
+  "dataset_config": "sentiment",
+  "seed": 42,
+  "device": "cpu",
+  "freeze_encoder": false,
+  "train_size": 1680,
+  "validation_size": 297,
+  "test_size": 494,
+  "class_labels": [
+    "negative",
+    "neutral",
+    "positive"
+  ],
+  "hyperparameters": {
+    "epochs": 3,
+    "batch_size": 8,
+    "eval_batch_size": 16,
+    "learning_rate": 2e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "max_length": 128
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.5015066574992878,
+      "validation_loss": 0.2895858543679902,
+      "validation_accuracy": 0.9663299663299664,
+      "validation_macro_f1": 0.64619974748084,
+      "validation_weighted_f1": 0.961535871473385
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.24911579408549836,
+      "validation_loss": 0.3167946410218352,
+      "validation_accuracy": 0.9663299663299664,
+      "validation_macro_f1": 0.6461248003098223,
+      "validation_weighted_f1": 0.9614797015678074
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.22852852051368072,
+      "validation_loss": 0.32342386490812425,
+      "validation_accuracy": 0.9629629629629629,
+      "validation_macro_f1": 0.6433862433862433,
+      "validation_weighted_f1": 0.9583239805462027
+    }
+  ],
+  "official_test": {
+    "accuracy": 0.9453441295546559,
+    "macro_f1": 0.6342258953168044,
+    "weighted_f1": 0.9376558369859804,
+    "loss": 0.4706617666468505,
+    "confusion_matrix": [
+      [
+        290,
+        0,
+        11
+      ],
+      [
+        6,
+        0,
+        2
+      ],
+      [
+        8,
+        0,
+        177
+      ]
+    ],
+    "classification_report": {
+      "negative": {
+        "precision": 0.9539473684210527,
+        "recall": 0.9634551495016611,
+        "f1-score": 0.9586776859504132,
+        "support": 301.0
+      },
+      "neutral": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 8.0
+      },
+      "positive": {
+        "precision": 0.9315789473684211,
+        "recall": 0.9567567567567568,
+        "f1-score": 0.944,
+        "support": 185.0
+      },
+      "accuracy": 0.9453441295546559,
+      "macro avg": {
+        "precision": 0.6285087719298246,
+        "recall": 0.6400706354194726,
+        "f1-score": 0.6342258953168044,
+        "support": 494.0
+      },
+      "weighted avg": {
+        "precision": 0.9301219901981673,
+        "recall": 0.9453441295546559,
+        "f1-score": 0.9376558369859804,
+        "support": 494.0
+      }
+    }
+  },
+  "limitations": [
+    "UTS2017_Bank chủ yếu là phản hồi khách hàng, không phải tiêu đề chứng khoán.",
+    "Lớp neutral rất ít; Macro-F1 và kết quả từng lớp phải được báo cáo cùng Accuracy.",
+    "Cần kiểm định thêm trên mẫu tiêu đề tin do con người gán nhãn."
+  ]
+}

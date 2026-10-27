@@ -4,9 +4,9 @@
 
 ## Tóm tắt
 
-Nghiên cứu đánh giá khả năng dự báo tỷ suất sinh lợi và độ biến động của tám cổ phiếu ngân hàng Việt Nam bằng mô hình chuỗi đa biến. Hai kiến trúc được khảo sát là Long Short-Term Memory (LSTM) và một Selective State Space Model tối giản lấy cảm hứng từ Mamba. Dữ liệu đầu vào gồm các đặc trưng thị trường có tính ổn định và hai đặc trưng tin tức: điểm cảm xúc trung bình và số lượng tiêu đề theo mã cổ phiếu, phiên giao dịch. Dữ liệu thị trường và tin tức bao phủ giai đoạn 2020–2026; tập dữ liệu tin sau lọc gồm 14.090 tiêu đề. Mẫu được chia theo thời gian thành train, validation và test để hạn chế rò rỉ thông tin. Các mô hình được đánh giá với Train Mean, Zero Return và Ridge, sử dụng RMSE, MAE, $R^2_{OOS}$, Directional Accuracy và QLIKE.
+Nghiên cứu đánh giá khả năng dự báo tỷ suất sinh lợi và độ biến động của tám cổ phiếu ngân hàng Việt Nam bằng mô hình chuỗi đa biến. Hai kiến trúc được khảo sát là Long Short-Term Memory (LSTM) và một Selective State Space Model tối giản lấy cảm hứng từ Mamba. Dữ liệu đầu vào gồm các đặc trưng thị trường có tính ổn định và hai đặc trưng tin tức: điểm cảm xúc PhoBERT trung bình và số lượng tiêu đề theo mã cổ phiếu, phiên giao dịch. PhoBERT-base-v2 được fine-tune trên UTS2017_Bank, sau đó dùng xác suất ba lớp để tạo điểm $P(positive)-P(negative)$. Dữ liệu thị trường và tin tức bao phủ giai đoạn 2020–2026; tập dữ liệu tin sau lọc gồm 14.090 tiêu đề. Mẫu được chia theo thời gian thành train, validation và test để hạn chế rò rỉ thông tin. Các mô hình được đánh giá với Train Mean, Zero Return và Ridge, sử dụng RMSE, MAE, $R^2_{OOS}$, Directional Accuracy và QLIKE.
 
-Ma trận chính gồm 568 lượt chạy và 249.352 dự báo. Đối với return một phiên, cấu hình Mamba-style kết hợp tin tức đạt RMSE 0,018923 và $R^2_{OOS}=-0,000126$, tiến gần nhưng chưa vượt Train Mean. Kết quả return 5 phiên cũng chưa vượt baseline. Đối với volatility 5 phiên, LSTM dùng dữ liệu thị trường đạt RMSE 0,009671 và $R^2_{OOS}=0,147791$, là cấu hình tốt nhất. Việc bổ sung đặc trưng tin tức không tạo cải thiện ổn định trên đa số mã và seed. Kết quả cho thấy volatility dễ dự báo hơn return trong phạm vi dữ liệu hiện có; đồng thời nhấn mạnh yêu cầu đánh giá nghiêm ngặt đối với chất lượng sentiment trước khi kết luận về giá trị của tin tức.
+Ma trận chính gồm 568 lượt chạy và 249.352 dự báo. Đối với return một phiên, cấu hình Mamba-style kết hợp PhoBERT đạt RMSE 0,018930 và $R^2_{OOS}=-0,000890$, tiến gần nhưng chưa vượt Train Mean. Kết quả return 5 phiên cũng chưa vượt baseline. Đối với volatility 5 phiên, LSTM dùng dữ liệu thị trường đạt RMSE 0,009671 và $R^2_{OOS}=0,147791$, là cấu hình tốt nhất. Việc bổ sung đặc trưng PhoBERT không tạo cải thiện ổn định trên đa số mã và seed, đồng thời không thắng sentiment từ điển một cách nhất quán. Kết quả cho thấy volatility dễ dự báo hơn return trong phạm vi dữ liệu hiện có; đồng thời nhấn mạnh yêu cầu đánh giá nghiêm ngặt đối với chất lượng sentiment trước khi kết luận về giá trị của tin tức.
 
 **Từ khóa:** Mamba, Selective State Space Model, LSTM, cổ phiếu ngân hàng, tỷ suất sinh lợi, độ biến động, sentiment, dữ liệu đa nguồn.
 
@@ -72,9 +72,9 @@ $A_t$, $B_t$ và $C_t$ phụ thuộc vào đầu vào, nhờ đó mô hình có 
 
 ### 3.3 Phân tích cảm xúc tin tức
 
-Phiên bản hiện tại không sử dụng PhoBERT. Sentiment được tính bằng từ điển tài chính tiếng Việt trên tiêu đề, gồm các bước chuẩn hóa văn bản, dò cụm từ tích cực/tiêu cực, cộng trọng số và chuẩn hóa điểm về `[-1,1]`. Đây là baseline NLP minh bạch nhưng không hiểu đầy đủ phủ định, đa nghĩa hoặc quan hệ ngữ cảnh.
+Ma trận chính sử dụng `vinai/phobert-base-v2` được fine-tune ba lớp trên cấu hình sentiment của `undertheseanlp/UTS2017_Bank`; đầu ra cho tin thứ $i$ là $s_i=P_i(positive)-P_i(negative)$. Train chính thức của UTS2017_Bank được tách tiếp thành train/validation có phân tầng, còn test chính thức chỉ dùng đánh giá cuối. Checkpoint epoch 1 được chọn bằng Macro-F1 validation. Trên test chính thức, mô hình đạt Accuracy 0,9453, Macro-F1 0,6342 và weighted-F1 0,9377. Ma trận nhầm lẫn cho thấy mô hình không dự đoán đúng mẫu neutral nào; trên 14.090 tiêu đề dự báo, nhãn cứng gồm 11.784 positive, 2.306 negative và 0 neutral. Vì vậy nghiên cứu sử dụng điểm xác suất liên tục thay cho nhãn cứng, đồng thời xem đây là hạn chế miền dữ liệu quan trọng.
 
-PhoBERT là mô hình ngôn ngữ tiền huấn luyện đơn ngữ cho tiếng Việt [Nguyen và Nguyen, 2020](https://aclanthology.org/2020.findings-emnlp.92/). Việc fine-tune PhoBERT cho cảm xúc tài chính là một hướng phát triển, không phải thành phần của kết quả hiện tại.
+Sentiment từ điển tài chính tiếng Việt được giữ làm đối chứng. Baseline này chuẩn hóa văn bản, dò cụm từ tích cực/tiêu cực, cộng trọng số và đưa điểm về `[-1,1]`; ưu điểm là minh bạch nhưng không hiểu đầy đủ ngữ cảnh. Toàn bộ kết quả từ điển được lưu tại `results/lexicon/`, cho phép so sánh trực tiếp với PhoBERT trên cùng cấu hình dự báo.
 
 ## 4. Dữ liệu
 
@@ -250,13 +250,13 @@ Volatility báo cáo QLIKE trên variance. Kiểm định HAC sử dụng chênh
 | Train Mean | Không áp dụng | **0,018921** | 0,012921 | 0,000000 | 0,462415 |
 | Zero Return | Không áp dụng | 0,018928 | **0,012859** | -0,000528 | 0,078588 |
 | Ridge | Market stationary | 0,018936 | 0,012936 | -0,001688 | 0,465831 |
-| Ridge | Market stationary + News | 0,018939 | 0,012954 | -0,002257 | 0,460421 |
+| Ridge | Market stationary + PhoBERT News | 0,018939 | 0,012953 | -0,002253 | 0,464408 |
 | LSTM | Market stationary | 0,018954 | 0,012962 | -0,003499 | 0,466629 |
-| LSTM | Market stationary + News | 0,018964 | 0,012967 | -0,004419 | **0,469476** |
+| LSTM | Market stationary + PhoBERT News | 0,018959 | 0,012971 | -0,003839 | 0,466059 |
 | Mamba-style | Market stationary | 0,018934 | 0,012939 | -0,001434 | 0,467084 |
-| Mamba-style | Market stationary + News | 0,018923 | 0,012929 | **-0,000126** | 0,463952 |
+| Mamba-style | Market stationary + PhoBERT News | 0,018930 | 0,012934 | **-0,000890** | 0,466002 |
 
-Train Mean có RMSE thấp nhất. Mamba-style kết hợp news là mạng gần baseline nhất, nhưng $R^2_{OOS}$ vẫn âm nhẹ. DA cao hơn 0,5 không xuất hiện trên trung bình nhóm; vì vậy chưa có bằng chứng về khả năng dự báo hướng ổn định.
+Train Mean có RMSE thấp nhất. Mamba-style kết hợp PhoBERT là mạng gần baseline nhất, nhưng $R^2_{OOS}$ vẫn âm nhẹ. DA cao hơn 0,5 không xuất hiện trên trung bình nhóm; vì vậy chưa có bằng chứng về khả năng dự báo hướng ổn định.
 
 ### 8.2 Return năm phiên
 
@@ -265,11 +265,11 @@ Train Mean có RMSE thấp nhất. Mamba-style kết hợp news là mạng gần
 | Train Mean | Không áp dụng | **0,042155** | 0,029591 | 0,000000 | 0,520216 |
 | Zero Return | Không áp dụng | 0,042214 | **0,029523** | -0,001933 | 0,000000 |
 | Ridge | Market stationary | 0,042462 | 0,030006 | -0,014534 | 0,507403 |
-| Ridge | Market stationary + News | 0,042363 | 0,029833 | -0,010069 | 0,519362 |
+| Ridge | Market stationary + PhoBERT News | 0,042208 | 0,029666 | -0,002344 | 0,519077 |
 | LSTM | Market stationary | 0,042368 | 0,029718 | -0,010051 | 0,516287 |
-| LSTM | Market stationary + News | 0,042251 | 0,029658 | -0,004272 | **0,524601** |
+| LSTM | Market stationary + PhoBERT News | 0,042259 | 0,029688 | -0,004518 | **0,522096** |
 | Mamba-style | Market stationary | 0,042262 | 0,029652 | -0,004833 | 0,520501 |
-| Mamba-style | Market stationary + News | 0,042208 | 0,029654 | **-0,002362** | 0,517084 |
+| Mamba-style | Market stationary + PhoBERT News | 0,042209 | 0,029651 | **-0,002417** | 0,518280 |
 
 Kéo dài horizon lên 5 phiên chưa giúp các mô hình vượt Train Mean trên trung bình nhóm. Mamba-style + News vẫn là mạng có $R^2_{OOS}$ gần 0 nhất.
 
@@ -279,11 +279,11 @@ Kéo dài horizon lên 5 phiên chưa giúp các mô hình vượt Train Mean tr
 |---|---|---:|---:|---:|---:|
 | Train Mean | Không áp dụng | 0,010491 | 0,008567 | 0,000000 | 0,692076 |
 | Log-Ridge | Market stationary | 0,010239 | 0,007208 | 0,046680 | 0,862484 |
-| Log-Ridge | Market stationary + News | 0,010447 | 0,007280 | 0,007350 | 1,092153 |
+| Log-Ridge | Market stationary + PhoBERT News | 0,010459 | 0,007289 | 0,004374 | 1,153182 |
 | LSTM | Market stationary | **0,009671** | 0,007276 | **0,147791** | **0,689216** |
-| LSTM | Market stationary + News | 0,009756 | **0,007197** | 0,132772 | 0,759970 |
+| LSTM | Market stationary + PhoBERT News | 0,009776 | **0,007209** | 0,129236 | 0,761927 |
 | Mamba-style | Market stationary | 0,009772 | 0,007333 | 0,128632 | 0,730341 |
-| Mamba-style | Market stationary + News | 0,009829 | 0,007278 | 0,118622 | 0,784686 |
+| Mamba-style | Market stationary + PhoBERT News | 0,009826 | 0,007293 | 0,119319 | 0,783877 |
 
 Các mô hình học được đều có $R^2_{OOS}$ dương ở cấp nhóm. LSTM Market stationary tốt nhất theo RMSE và $R^2_{OOS}$. Mamba-style Market stationary đứng sau LSTM, do đó kết quả không ủng hộ khẳng định Mamba tốt hơn LSTM trong cấu hình hiện tại.
 
@@ -291,14 +291,16 @@ Các mô hình học được đều có $R^2_{OOS}$ dương ở cấp nhóm. LS
 
 | Target | Mô hình | News tốt hơn | Tổng số cặp mã–seed | Cải thiện MSE trung bình |
 |---|---|---:|---:|---:|
-| Return h1 | LSTM | 19 | 40 | -0,00000049 |
-| Return h1 | Mamba-style | 20 | 40 | 0,00000038 |
-| Return h5 | LSTM | 17 | 40 | 0,00000998 |
-| Return h5 | Mamba-style | 19 | 40 | 0,00000474 |
-| Volatility h5 | LSTM | 16 | 40 | -0,00000183 |
-| Volatility h5 | Mamba-style | 17 | 40 | -0,00000121 |
+| Return h1 | LSTM | 19 | 40 | -0,00000031 |
+| Return h1 | Mamba-style | 19 | 40 | 0,00000013 |
+| Return h5 | LSTM | 18 | 40 | 0,00000889 |
+| Return h5 | Mamba-style | 21 | 40 | 0,00000472 |
+| Volatility h5 | LSTM | 16 | 40 | -0,00000223 |
+| Volatility h5 | Mamba-style | 17 | 40 | -0,00000113 |
 
-Giá trị dương ở cột cuối có lợi cho news. Tuy nhiên, tỷ lệ cải thiện không vượt quá 20/40 đối với mạng và mức cải thiện trung bình rất nhỏ. Với volatility, news làm RMSE nhóm xấu đi ở cả hai kiến trúc. Vì vậy chưa có bằng chứng ổn định rằng hai đặc trưng sentiment/count hiện tại tạo giá trị dự báo tăng thêm.
+Giá trị dương ở cột cuối có lợi cho news. Chỉ Mamba return h5 vượt 20/40 với tỷ lệ 21/40 và mức cải thiện trung bình rất nhỏ. Với volatility, news làm RMSE nhóm xấu đi ở cả hai kiến trúc. Vì vậy chưa có bằng chứng ổn định rằng hai đặc trưng sentiment/count hiện tại tạo giá trị dự báo tăng thêm.
+
+So với sentiment từ điển, PhoBERT cũng không thắng nhất quán. Với Mamba-style, PhoBERT có RMSE thấp hơn từ điển ở 15/40 cặp return h1, 10/40 cặp return h5 và 17/40 cặp volatility. Chênh lệch RMSE trung bình giữa hai phương pháp rất nhỏ. Kết quả cho thấy một mô hình NLP phức tạp hơn không tự động tạo tín hiệu dự báo tài chính tốt hơn khi dữ liệu fine-tune khác miền và lệch lớp.
 
 ### 8.5 Biểu đồ
 
@@ -325,14 +327,14 @@ Volatility có cấu trúc thời gian rõ hơn return. LSTM và Mamba-style đ�
 Tin tức không cải thiện ổn định trên toàn nhóm. Có ba cách giải thích cần được phân biệt:
 
 1. sentiment/count thực sự chỉ mang tín hiệu yếu ở tần suất ngày;
-2. tiêu đề và từ điển hiện tại chưa biểu diễn đủ ngữ cảnh tài chính;
+2. PhoBERT được fine-tune trên phản hồi dịch vụ ngân hàng, chưa thích nghi tốt với tiêu đề chứng khoán và lớp neutral;
 3. tác động tin tức khác nhau theo mã, loại sự kiện và trạng thái thị trường nên bị làm loãng khi lấy trung bình ngày.
 
-Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark sentiment do con người gán nhãn. Mẫu 90 tiêu đề đã được tạo nhưng chưa có nhãn thủ công; do đó phần kết luận về news phải được xem là sơ bộ.
+Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark sentiment do con người gán nhãn. Mẫu 90 tiêu đề đã được tạo nhưng chưa có nhãn thủ công; do đó phần kết luận về news phải được xem là sơ bộ. Kết quả Accuracy cao trên UTS2017_Bank không thay thế đánh giá miền đích, đặc biệt khi Macro-F1 thấp hơn đáng kể và mô hình không nhận diện neutral.
 
 ## 10. Độ tin cậy và khả năng tái lập
 
-- 26 kiểm thử tự động kiểm tra target, leakage, cutoff tin, mô hình, baseline và metric.
+- 25 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ánh xạ sentiment, mô hình, baseline và metric.
 - Manifest lưu cấu hình, phiên bản môi trường, checksum mã nguồn và checksum dữ liệu.
 - Kết quả gồm 568 định danh duy nhất và 249.352 dự báo hợp lệ.
 - Mọi dự báo volatility đều dương.
@@ -341,8 +343,8 @@ Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark se
 
 ## 11. Hạn chế
 
-1. Sentiment chỉ dựa trên từ điển và tiêu đề, chưa sử dụng nội dung toàn văn hoặc mô hình ngôn ngữ như PhoBERT.
-2. Mẫu sentiment 90 tiêu đề chưa được gán nhãn thủ công, nên chưa có Accuracy và Macro-F1.
+1. UTS2017_Bank là phản hồi khách hàng, không phải tiêu đề chứng khoán; neutral chỉ chiếm khoảng 1–2% và PhoBERT không dự đoán đúng neutral trên test chính thức.
+2. Mẫu 90 tiêu đề chưa được gán nhãn thủ công, nên chưa có Accuracy và Macro-F1 trên đúng miền tin chứng khoán.
 3. Google News RSS là chỉ mục động; kết quả truy hồi trong tương lai có thể khác snapshot hiện tại.
 4. Selective SSM là bản Mamba-style nhỏ, không phải triển khai Mamba chính thức.
 5. Mỗi mã được huấn luyện riêng, chưa khai thác cấu trúc liên mã bằng mô hình pooled.
@@ -358,14 +360,14 @@ Nghiên cứu đã xây dựng thành công một pipeline đa nguồn có kiể
 - volatility 5 phiên có khả năng dự báo ngoài mẫu rõ ràng;
 - LSTM Market stationary là cấu hình tốt nhất, đạt $R^2_{OOS}=0,147791$;
 - Mamba-style vượt Train Mean trong dự báo volatility nhưng chưa vượt LSTM;
-- sentiment và news count chưa tạo giá trị tăng thêm ổn định.
+- PhoBERT sentiment và news count chưa tạo giá trị tăng thêm ổn định, đồng thời chưa vượt sentiment từ điển một cách nhất quán.
 
 Do đó, đóng góp phù hợp nhất của đề tài không phải là khẳng định Mamba luôn vượt trội, mà là xây dựng một quy trình đánh giá minh bạch và chỉ ra sự khác biệt giữa khả năng dự báo return và volatility trên dữ liệu ngân hàng Việt Nam.
 
 ## 13. Hướng phát triển
 
-1. Hoàn tất gán nhãn thủ công mẫu sentiment và báo cáo Accuracy, Macro-F1, confusion matrix.
-2. Fine-tune PhoBERT trên dữ liệu cảm xúc tài chính Việt Nam và so sánh trực tiếp với từ điển.
+1. Hoàn tất gán nhãn thủ công mẫu sentiment và báo cáo Accuracy, Macro-F1, confusion matrix cho cả từ điển và PhoBERT.
+2. Fine-tune tiếp PhoBERT bằng tập tiêu đề chứng khoán đã gán nhãn và so sánh với checkpoint UTS2017_Bank hiện tại.
 3. Phân loại tin theo loại sự kiện thay vì chỉ dùng điểm trung bình và số lượng.
 4. Xây dựng mô hình pooled cho tám mã với ticker embedding và ablation tương ứng.
 5. Thực hiện walk-forward validation và kiểm tra nhiều giai đoạn thị trường.
@@ -377,6 +379,7 @@ Do đó, đóng góp phù hợp nhất của đề tài không phải là khẳn
 2. Gu, A., & Dao, T. (2023). *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*. arXiv:2312.00752. https://arxiv.org/abs/2312.00752
 3. Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory*. Neural Computation, 9(8), 1735–1780. https://doi.org/10.1162/NECO.1997.9.8.1735
 4. Nguyen, D. Q., & Nguyen, A. T. (2020). *PhoBERT: Pre-trained language models for Vietnamese*. Findings of EMNLP 2020, 1037–1042. https://doi.org/10.18653/v1/2020.findings-emnlp.92
+5. UnderTheSea NLP. (2017). *UTS2017_Bank: A Vietnamese Banking Domain Dataset for Aspect-Based Sentiment Analysis*. https://huggingface.co/datasets/undertheseanlp/UTS2017_Bank
 
 ## Phụ lục: tệp kết quả chính
 

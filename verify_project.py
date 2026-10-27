@@ -34,7 +34,8 @@ def _boolean_series(values: pd.Series) -> pd.Series:
 
 def assert_source_layout() -> None:
     expected = (
-        "config.py", "get_data.py", "collect_news.py", "evaluate_sentiment.py",
+        "config.py", "phobert_sentiment.py", "evaluate_sentiment.py",
+        "compare_sentiment_methods.py",
         "data_quality.py", "preprocess.py",
         "baselines.py", "train.py", "run_experiments.py", "evaluate.py",
         "generate_report.py", "provenance.py", "NEWS_DATA_SCHEMA.md",
