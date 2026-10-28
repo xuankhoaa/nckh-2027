@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 
 import pandas as pd
 
@@ -21,6 +23,17 @@ def valid_frame() -> pd.DataFrame:
 
 
 class DataQualityTests(unittest.TestCase):
+    def test_text_checksum_is_independent_of_line_endings(self) -> None:
+        from data_quality import sha256_text_file
+
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            lf_path = directory / "lf.txt"
+            crlf_path = directory / "crlf.txt"
+            lf_path.write_bytes(b"dong 1\ndong 2\n")
+            crlf_path.write_bytes(b"dong 1\r\ndong 2\r\n")
+            self.assertEqual(sha256_text_file(lf_path), sha256_text_file(crlf_path))
+
     def test_valid_stock_has_no_warning(self) -> None:
         self.assertEqual(validate_ohlcv(valid_frame(), "VCB"), [])
 

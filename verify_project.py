@@ -11,7 +11,7 @@ import pandas as pd
 
 from config import TICKERS
 from console import configure_utf8_output
-from data_quality import data_inventory, sha256_file
+from data_quality import data_inventory, sha256_file, sha256_text_file
 from evaluate import RESULTS_DIR
 
 
@@ -86,7 +86,7 @@ def assert_experiment_outputs() -> None:
     changed_sources = [
         name
         for name, expected_hash in manifest.get("source_sha256", {}).items()
-        if not Path(name).is_file() or sha256_file(Path(name)) != expected_hash
+        if not Path(name).is_file() or sha256_text_file(Path(name)) != expected_hash
     ]
     if changed_sources:
         raise ValueError(f"Mã nguồn đã khác manifest của lần chạy: {changed_sources}")

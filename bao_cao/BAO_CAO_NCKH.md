@@ -334,7 +334,7 @@ Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark se
 
 ## 10. Độ tin cậy và khả năng tái lập
 
-- 26 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, ánh xạ sentiment, mô hình, baseline và metric.
+- 27 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, checksum đa nền tảng, ánh xạ sentiment, mô hình, baseline và metric.
 - Manifest lưu cấu hình, phiên bản môi trường, checksum mã nguồn và checksum dữ liệu.
 - Kết quả gồm 568 định danh duy nhất và 249.352 dự báo hợp lệ.
 - Mọi dự báo volatility đều dương.

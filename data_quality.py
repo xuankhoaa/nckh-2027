@@ -108,6 +108,12 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_text_file(path: Path) -> str:
+    """Checksum văn bản độc lập LF/CRLF để kiểm chứng trên nhiều hệ điều hành."""
+    content = path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
 def data_inventory(data_dir: Path, symbols: Iterable[str], source: str) -> dict[str, object]:
     """Trả về thông tin đủ để tái lập đúng snapshot dữ liệu đang sử dụng."""
     records: list[dict[str, object]] = []

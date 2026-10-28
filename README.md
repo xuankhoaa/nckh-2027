@@ -139,7 +139,7 @@ Kết quả được tổng hợp theo từng mã, trung bình và độ lệch 
 
 ## 7. Kết quả chính
 
-Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 26 kiểm thử tự động của kho công khai đều đạt.
+Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 27 kiểm thử tự động của kho công khai đều đạt.
 
 ### 7.1 Return một phiên
 

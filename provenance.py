@@ -14,7 +14,7 @@ import torch
 
 from console import configure_utf8_output
 from config import DATA_SOURCE, TICKERS
-from data_quality import sha256_file, write_data_manifest
+from data_quality import sha256_file, sha256_text_file, write_data_manifest
 from evaluate import RESULTS_DIR
 
 
@@ -100,7 +100,7 @@ def write_experiment_manifest(
         "git_commit": _git_commit(),
         "git_worktree_dirty": _git_worktree_dirty(),
         "source_sha256": {
-            path: sha256_file(PROJECT_DIR / path) for path in SOURCE_FILES
+            path: sha256_text_file(PROJECT_DIR / path) for path in SOURCE_FILES
         },
         "python": platform.python_version(),
         "platform": platform.platform(),
