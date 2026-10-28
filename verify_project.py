@@ -21,6 +21,14 @@ IDENTITY = [
     "validation_shrinkage", "seed", "parameter_count",
 ]
 
+# Manifest gốc ghi lại toàn bộ mã lúc huấn luyện. Công cụ điều phối và kiểm tra
+# có thể được sửa sau đó mà không làm thay đổi các dự báo đã công bố.
+PREDICTION_SOURCE_FILES = {
+    "config.py", "data_quality.py", "phobert_sentiment.py", "preprocess.py",
+    "baselines.py", "models/lstm.py", "models/mamba_model.py",
+    "train.py", "evaluate.py",
+}
+
 
 def _boolean_series(values: pd.Series) -> pd.Series:
     """Đọc cột bool ổn định dù pandas trả về bool hay chuỗi."""
@@ -73,6 +81,50 @@ def _expected_runs(manifest: dict[str, object]) -> int:
     return total
 
 
+def assert_metric_reproduction(metrics: pd.DataFrame, predictions: pd.DataFrame) -> None:
+    """Tính lại metric từ dự báo test, đối chiếu từng run với bảng công bố."""
+    baseline = predictions.loc[predictions["model"].eq("train_mean")]
+    baseline_keys = ["ticker", "target", "horizon", "window"]
+    benchmark_by_group: dict[tuple[object, ...], pd.DataFrame] = {}
+    for key, frame in baseline.groupby(baseline_keys, sort=False):
+        if frame["date"].duplicated().any():
+            raise ValueError(f"Train Mean có ngày test trùng lặp: {key}")
+        benchmark_by_group[key] = frame.set_index("date")
+
+    indexed_metrics = metrics.set_index(IDENTITY)
+    for identity, frame in predictions.groupby(IDENTITY, sort=False):
+        if frame["date"].duplicated().any():
+            raise ValueError(f"Một cấu hình có ngày dự báo trùng lặp: {identity}")
+        row = indexed_metrics.loc[identity]
+        actual = frame["actual_value"].to_numpy(dtype=float)
+        forecast = frame["predicted_value"].to_numpy(dtype=float)
+        squared_error = (actual - forecast) ** 2
+        calculated = {
+            "rmse": float(np.sqrt(squared_error.mean())),
+            "mae": float(np.abs(actual - forecast).mean()),
+            "r2_test": float(1 - squared_error.sum() / ((actual - actual.mean()) ** 2).sum()),
+        }
+        group_key = (identity[1], identity[2], identity[3], identity[4])
+        if group_key not in benchmark_by_group:
+            raise ValueError(f"Thiếu Train Mean cho {group_key}")
+        reference = benchmark_by_group[group_key].reindex(frame["date"])
+        if reference["predicted_value"].isna().any() or not np.allclose(
+            reference["actual_value"].to_numpy(dtype=float), actual, rtol=0, atol=1e-8
+        ):
+            raise ValueError(f"Ngày/nhãn test không khớp Train Mean: {identity}")
+        benchmark = reference["predicted_value"].to_numpy(dtype=float)
+        calculated["r2_oos"] = float(1 - squared_error.sum() / ((actual - benchmark) ** 2).sum())
+        if identity[2] == "return":
+            calculated["directional_accuracy"] = float((np.sign(actual) == np.sign(forecast)).mean())
+        else:
+            epsilon = np.finfo(float).eps
+            ratio = np.maximum(actual, epsilon) ** 2 / np.maximum(forecast, epsilon) ** 2
+            calculated["qlike"] = float(np.mean(ratio - np.log(ratio) - 1))
+        for name, value in calculated.items():
+            if not np.isclose(float(row[name]), value, rtol=1e-6, atol=1e-8):
+                raise ValueError(f"Metric {name} không khớp dự báo test của {identity}")
+
+
 def assert_experiment_outputs() -> None:
     metrics_path = RESULTS_DIR / "metrics.csv"
     predictions_path = RESULTS_DIR / "predictions.csv"
@@ -86,6 +138,7 @@ def assert_experiment_outputs() -> None:
     changed_sources = [
         name
         for name, expected_hash in manifest.get("source_sha256", {}).items()
+        if name in PREDICTION_SOURCE_FILES
         if not Path(name).is_file() or sha256_text_file(Path(name)) != expected_hash
     ]
     if changed_sources:
@@ -148,6 +201,7 @@ def assert_experiment_outputs() -> None:
     volatility = predictions["target"].eq("volatility")
     if volatility.any() and not predictions.loc[volatility, "predicted_value"].gt(0).all():
         raise ValueError("Dự báo volatility phải dương.")
+    assert_metric_reproduction(metrics, predictions)
     print(f"Kết quả: {len(metrics)} lần chạy và {len(predictions)} dự báo hợp lệ.")
 
 

@@ -212,5 +212,5 @@ $\bar d>0$ có lợi cho mô hình. Sai số chuẩn dùng Newey–West/HAC; v�
 | Volatility h5 | Train Mean, log-Ridge | LSTM, Mamba | Market stationary, Market stationary + News |
 
 Mỗi mạng chạy 5 seed trên 8 mã. Toàn ma trận chính có 568 lượt chạy. Hai
-ablation legacy và sensitivity được báo cáo tách khỏi ma trận chính để tránh
-làm mờ giả thuyết chính.
+ablation thành phần và sensitivity chưa được chạy trong kết quả công bố; nếu
+thực hiện sẽ báo cáo riêng, không trộn vào ma trận chính.

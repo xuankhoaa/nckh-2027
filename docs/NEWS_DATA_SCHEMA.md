@@ -77,8 +77,8 @@ mát dùng trọng số lớp theo căn bậc hai nghịch đảo tần suất �
 neutral mà không khuếch đại quá mức số ít mẫu neutral.
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py train
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score
+& .\.venv\Scripts\python.exe phobert_sentiment.py train
+& .\.venv\Scripts\python.exe phobert_sentiment.py score
 ```
 
 Mỗi tiêu đề có thêm ba xác suất, nhãn có xác suất lớn nhất, confidence và:
@@ -103,7 +103,7 @@ Mở `data/news_validation_sample.csv`, đọc tiêu đề và điền `human_la
 `negative`, `neutral` hoặc `positive`. Sau đó chạy:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py
+& .\.venv\Scripts\python.exe evaluate_sentiment.py
 ```
 
 Báo cáo số mẫu, Accuracy, macro-F1 và confusion matrix. Nếu hai người gán nhãn,
@@ -112,10 +112,10 @@ nên báo cáo thêm mức đồng thuận; khi bất đồng thì thảo luận
 Để kiểm định PhoBERT, chấm chính tệp mẫu rồi giữ nguyên cột `human_label`:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score `
+& .\.venv\Scripts\python.exe phobert_sentiment.py score `
   --input data/news_validation_sample.csv `
   --output data/news_validation_sample_phobert.csv
-& "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py `
+& .\.venv\Scripts\python.exe evaluate_sentiment.py `
   --sample data/news_validation_sample_phobert.csv
 ```
 

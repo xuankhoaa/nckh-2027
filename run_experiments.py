@@ -23,7 +23,7 @@ from config import (
     TICKERS,
 )
 from console import configure_utf8_output
-from data_quality import validate_news_coverage
+from data_quality import sha256_file, validate_news_coverage
 from evaluate import plot_group_metric_comparison, reset_generated_results
 from provenance import write_experiment_manifest
 from preprocess import aggregate_news_features
@@ -95,20 +95,22 @@ def _experiment_key(experiment: Experiment) -> tuple[object, ...]:
 
 def _completed_keys() -> set[tuple[object, ...]]:
     path = Path("results/metrics.csv")
-    if not path.is_file():
+    prediction_path = Path("results/predictions.csv")
+    if not path.is_file() or not prediction_path.is_file():
         return set()
     frame = pd.read_csv(path)
+    prediction_rows = pd.read_csv(prediction_path)
     required = [
         "model", "ticker", "target", "horizon", "window", "feature_set",
         "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
         "validation_shrinkage", "seed",
     ]
-    if not set(required).issubset(frame.columns):
-        raise ValueError("Không thể resume từ results/metrics.csv khác schema.")
+    if not set(required).issubset(frame.columns) or not set(required).issubset(prediction_rows.columns):
+        raise ValueError("Không thể resume từ results/ khác schema.")
     bool_values = frame["validation_shrinkage"]
     if not pd.api.types.is_bool_dtype(bool_values):
         bool_values = bool_values.astype(str).str.lower().eq("true")
-    return {
+    metric_keys = {
         (
             row.model, row.ticker, row.target, int(row.horizon), int(row.window),
             row.feature_set, int(row.news_cutoff_hour), float(row.tail_weight),
@@ -116,6 +118,15 @@ def _completed_keys() -> set[tuple[object, ...]]:
         )
         for row, shrinkage in zip(frame[required].itertuples(index=False), bool_values)
     }
+    prediction_keys = {
+        (
+            row.model, row.ticker, row.target, int(row.horizon), int(row.window),
+            row.feature_set, int(row.news_cutoff_hour), float(row.tail_weight),
+            row.loss_name, float(row.weight_decay), str(row.validation_shrinkage).lower() == "true", int(row.seed),
+        )
+        for row in prediction_rows[required].itertuples(index=False)
+    }
+    return metric_keys & prediction_keys
 
 
 def _assert_resume_compatible(args: argparse.Namespace, feature_sets: tuple[str, ...]) -> None:
@@ -123,7 +134,8 @@ def _assert_resume_compatible(args: argparse.Namespace, feature_sets: tuple[str,
     manifest_path = Path("results/EXPERIMENT_MANIFEST.json")
     if not manifest_path.is_file():
         raise FileNotFoundError("Không thể --resume khi thiếu EXPERIMENT_MANIFEST.json.")
-    previous = json.loads(manifest_path.read_text(encoding="utf-8"))["experiment"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    previous = manifest["experiment"]
     requested = {
         "tickers": list(args.tickers),
         "seeds": list(args.seeds),
@@ -150,6 +162,19 @@ def _assert_resume_compatible(args: argparse.Namespace, feature_sets: tuple[str,
             + ", ".join(changed)
             + ". Hãy chạy ma trận mới không dùng --resume."
         )
+    if any(_uses_news(name) for name in feature_sets):
+        news_info = manifest.get("news_data", {})
+        news_path = Path(args.news_path)
+        if (
+            news_info.get("path", "").replace("\\", "/") != news_path.as_posix()
+            or not news_path.is_file()
+            or news_info.get("sha256") != sha256_file(news_path)
+        ):
+            raise ValueError("Không thể --resume vì file tin tức khác lần chạy trước.")
+    for record in manifest.get("data_manifest", {}).get("files", []):
+        market_path = Path("data") / f"{record['symbol']}.csv"
+        if not market_path.is_file() or sha256_file(market_path) != record["sha256"]:
+            raise ValueError(f"Không thể chạy tiếp vì dữ liệu {record['symbol']} đã thay đổi.")
 
 
 def _neural_runs(
@@ -211,11 +236,24 @@ def main() -> None:
     ]))
     if any(_uses_news(name) for name in feature_sets):
         _validate_news_before_reset(args)
-    if args.resume:
+    if args.resume or args.keep_results:
         _assert_resume_compatible(args, feature_sets)
     if not args.keep_results and not args.resume:
         reset_generated_results()
     started_at = datetime.now(timezone.utc).isoformat()
+    if not args.resume and not args.keep_results:
+        write_experiment_manifest(
+            windows=args.windows, seeds=args.seeds, tickers=args.tickers,
+            targets=args.targets, feature_sets=feature_sets,
+            return_horizons=args.return_horizons,
+            volatility_horizon=args.volatility_horizon, news_path=args.news_path,
+            news_cutoff_hours=args.news_cutoff_hours,
+            tail_weights=args.tail_weights, return_loss=args.return_loss,
+            volatility_loss=args.volatility_loss, weight_decay=args.weight_decay,
+            validation_shrinkage=args.validation_shrinkage,
+            ridge_alphas=args.ridge_alphas, include_ridge=args.include_ridge,
+            epochs=args.epochs, batch_size=args.batch_size, started_at=started_at,
+        )
     runs: list[Experiment] = []
     for target in args.targets:
         horizons = args.return_horizons if target == "return" else [args.volatility_horizon]
@@ -277,27 +315,6 @@ def main() -> None:
         for horizon in horizons:
             for window in args.windows:
                 plot_group_metric_comparison(window, target, horizon)
-    write_experiment_manifest(
-        windows=args.windows,
-        seeds=args.seeds,
-        tickers=args.tickers,
-        targets=args.targets,
-        feature_sets=feature_sets,
-        return_horizons=args.return_horizons,
-        volatility_horizon=args.volatility_horizon,
-        news_path=args.news_path,
-        news_cutoff_hours=args.news_cutoff_hours,
-        tail_weights=args.tail_weights,
-        return_loss=args.return_loss,
-        volatility_loss=args.volatility_loss,
-        weight_decay=args.weight_decay,
-        validation_shrinkage=args.validation_shrinkage,
-        ridge_alphas=args.ridge_alphas,
-        include_ridge=args.include_ridge,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        started_at=started_at,
-    )
 
 
 if __name__ == "__main__":

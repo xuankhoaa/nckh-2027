@@ -80,7 +80,7 @@ Sentiment từ điển tài chính tiếng Việt được giữ làm đối ch�
 
 ### 4.1 Dữ liệu thị trường
 
-Dữ liệu gồm `time`, `open`, `high`, `low`, `close`, `volume` của tám mã và VN-Index. Các tệp được kiểm tra cột bắt buộc, thứ tự thời gian, ngày trùng, giá trị không hữu hạn và quy tắc OHLC. Snapshot có khoảng 1.689 phiên cho mỗi chuỗi, riêng ACB có 1.684 phiên.
+Dữ liệu gồm `time`, `open`, `high`, `low`, `close`, `volume` của tám mã và VN-Index. Các tệp được kiểm tra cột bắt buộc, thứ tự thời gian, ngày trùng, giá trị không hữu hạn và quy tắc OHLC. Snapshot có khoảng 1.689 phiên cho mỗi chuỗi, riêng ACB có 1.684 phiên. Ba dòng VN-Index từ nguồn có `close` nằm ngoài khoảng `[low, high]`; pipeline chỉ dùng `close` của VN-Index để tính return thị trường và giữ nguyên bản ghi gốc trong snapshot.
 
 ### 4.2 Dữ liệu tin tức
 
@@ -144,7 +144,7 @@ Các đặc trưng bổ sung gồm volatility lịch sử 5/20 phiên, momentum 
 - `Market stationary`: 13 đặc trưng thị trường.
 - `Market stationary + News`: 13 đặc trưng thị trường cộng `sentiment_score` và `news_count`.
 
-Hai cấu hình legacy loại riêng sentiment hoặc news count vẫn có trong mã nguồn nhưng không thuộc ma trận chính lần này.
+Hai cấu hình bổ sung loại riêng sentiment hoặc news count vẫn có trong mã nguồn nhưng chưa được chạy trong ma trận chính lần này.
 
 ### 5.3 Target return
 
@@ -353,12 +353,12 @@ Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark se
 
 ## 10. Độ tin cậy và khả năng tái lập
 
-- 27 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, checksum đa nền tảng, ánh xạ sentiment, mô hình, baseline và metric.
+- 29 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, checksum đa nền tảng, ánh xạ sentiment, tiếp tục sau gián đoạn, mô hình, baseline và metric.
 - Manifest lưu cấu hình, phiên bản môi trường, checksum mã nguồn và checksum dữ liệu.
 - Kết quả gồm 568 định danh duy nhất và 249.352 dự báo hợp lệ.
 - Mọi dự báo volatility đều dương.
 - Báo cáo có bảng từng mã, độ lệch chuẩn seed, tổng hợp nhóm và kiểm định HAC.
-- `verify_project.py --require-results` xác nhận đầy đủ số lượt chạy và sự khớp giữa kết quả với manifest.
+- `verify_project.py --require-results` xác nhận đầy đủ số lượt chạy, đối chiếu checksum dữ liệu và mã nguồn ảnh hưởng đến dự báo, rồi tính lại metric từ từng dự báo test. Manifest gốc vẫn lưu hash của toàn bộ mã lúc huấn luyện; hai công cụ điều phối và xác minh được sửa sau lần chạy công bố nên hash của chúng khác bản gốc.
 
 ## 11. Hạn chế
 

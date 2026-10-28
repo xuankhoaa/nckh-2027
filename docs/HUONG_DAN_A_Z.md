@@ -19,15 +19,17 @@ mã, nên không thực hiện ablation đó.
 
 ## 2. Môi trường
 
-Kết quả hiện tại được tạo bằng môi trường `%USERPROFILE%\.venv`. Snapshot dữ
-liệu đã được công bố cùng kho nên môi trường huấn luyện không cần Vnstock hay
-API key:
+Snapshot dữ liệu đã có trong kho nên không cần Vnstock hay API key. Tạo môi
+trường ảo riêng tại thư mục dự án (Windows PowerShell):
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -r requirements.txt
+py -3 -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 Không gửi API key qua chat và không commit `.env`.
+Trên macOS/Linux, dùng `python3 -m venv .venv` và `.venv/bin/python` thay
+cho `.\.venv\Scripts\python.exe` trong các lệnh phía dưới.
 
 ## 3. Dữ liệu thị trường
 
@@ -56,8 +58,8 @@ published_at,ticker,sentiment_score
 Huấn luyện và áp dụng PhoBERT:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py train
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score
+& .\.venv\Scripts\python.exe phobert_sentiment.py train
+& .\.venv\Scripts\python.exe phobert_sentiment.py score
 ```
 
 `data/news_phobert.csv` là đầu vào mặc định của lệnh huấn luyện hiện tại. Kết
@@ -72,7 +74,7 @@ quả cũ.
 Điền cột `human_label` của mẫu bằng `negative`, `neutral` hoặc `positive`, rồi chạy:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" evaluate_sentiment.py
+& .\.venv\Scripts\python.exe evaluate_sentiment.py
 ```
 
 Ghi Accuracy, macro-F1 và ma trận nhầm lẫn vào phụ lục cho cả từ điển và
@@ -93,12 +95,15 @@ fit trên train. Hệ số co dự báo và Ridge alpha chỉ được chọn b�
 
 ## 6. Chạy thử một cấu hình
 
+Các lệnh `train.py` và `run_experiments.py` ghi vào `results/`. Để giữ nguyên
+bản kết quả công bố, hãy chạy thử trên một bản clone khác của repository.
+
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model mamba --ticker VCB --target return --feature-set market_stationary --seed 42 --epochs 5
+& .\.venv\Scripts\python.exe train.py --model mamba --ticker VCB --target return --feature-set market_stationary --seed 42 --epochs 5
 ```
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" train.py --model lstm --ticker VCB --target volatility --feature-set market_stationary_news --seed 42 --epochs 5
+& .\.venv\Scripts\python.exe train.py --model lstm --ticker VCB --target volatility --feature-set market_stationary_news --seed 42 --epochs 5
 ```
 
 ## 7. Chạy các ma trận
@@ -106,25 +111,25 @@ fit trên train. Hệ số co dự báo và Ridge alpha chỉ được chọn b�
 Market-only, hai bài toán:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --feature-sets market_stationary
+& .\.venv\Scripts\python.exe run_experiments.py --feature-sets market_stationary
 ```
 
 Ma trận chính sau khi có news:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py
+& .\.venv\Scripts\python.exe run_experiments.py
 ```
 
 Thêm ablation:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --include-ablations
+& .\.venv\Scripts\python.exe run_experiments.py --include-ablations
 ```
 
 Sensitivity có kiểm soát:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --include-ablations --windows 20 30 60 --tail-weights 1 2 --news-cutoff-hours 14 15 16
+& .\.venv\Scripts\python.exe run_experiments.py --include-ablations --windows 20 30 60 --tail-weights 1 2 --news-cutoff-hours 14 15 16
 ```
 
 Lưới sensitivity làm số lượt chạy tăng mạnh. Nên chạy ma trận chính trước; chỉ chạy lưới đã đăng ký trước, không chọn lại tham số bằng test.
@@ -132,15 +137,16 @@ Lưới sensitivity làm số lượt chạy tăng mạnh. Nên chạy ma trận
 Nếu một lần chạy bị gián đoạn sau khi đã ghi một phần kết quả:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --resume
+& .\.venv\Scripts\python.exe run_experiments.py --resume
 ```
 
-Chế độ này bỏ qua đúng các định danh đã hoàn tất rồi ghi manifest đầy đủ khi xong.
+Manifest được ghi trước lượt chạy đầu tiên. Chế độ này chỉ bỏ qua lượt có cả
+metric và dự báo; cấu hình và file tin phải trùng lần chạy trước.
 
 ## 8. Sinh và đọc báo cáo
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" generate_report.py --window 30
+& .\.venv\Scripts\python.exe generate_report.py --window 30
 ```
 
 - Return: đọc RMSE, MAE, R² OOS và DA.
@@ -152,13 +158,14 @@ Chế độ này bỏ qua đúng các định danh đã hoàn tất rồi ghi ma
 ## 9. Kiểm tra trước khi nộp
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m unittest discover -s tests -v
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m compileall -q .
-& "$env:USERPROFILE\.venv\Scripts\python.exe" verify_project.py --require-results
+& .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+& .\.venv\Scripts\python.exe -m compileall -q .
+& .\.venv\Scripts\python.exe verify_project.py --require-results
 ```
 
-Tùy chọn `--require-results` yêu cầu đủ output theo schema hiện hành và đối chiếu
-checksum mã nguồn với manifest của lần chạy. Mặc định `run_experiments.py` chỉ
+Tùy chọn `--require-results` yêu cầu đủ output theo schema hiện hành, tính lại
+metric từ từng dự báo test và đối chiếu checksum dữ liệu cùng mã nguồn ảnh hưởng
+đến dự báo với manifest gốc. Mặc định `run_experiments.py` chỉ
 xóa output có thể tái tạo, không xóa dữ liệu gốc.
 
 ## 10. Câu kết luận được phép viết
