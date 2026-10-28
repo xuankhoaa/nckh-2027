@@ -66,4 +66,4 @@ RMSE/MAE càng thấp càng tốt. DA chỉ dùng cho return; QLIKE chỉ dùng 
 
 Bảng này ghép đúng cùng mô hình, mã và seed. Cải thiện MSE dương nghĩa là Market+News tốt hơn Market-only; p-value HAC là bằng chứng bổ sung, chưa điều chỉnh nhiều lần.
 
-Manifest lần chạy: Git `a4206d1aa431e783a5b0e8d06b38ba7e8558f4ae`, Python 3.13.13.
+Manifest lần chạy: Git `f34ac3ffa53c4d194b5ad88bdc65892d7935c01b`, Python 3.13.13.
