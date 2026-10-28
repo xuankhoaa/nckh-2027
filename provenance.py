@@ -45,11 +45,14 @@ def _git_commit() -> str | None:
 
 
 def _git_worktree_dirty() -> bool | None:
-    """Ghi rõ khi HEAD chưa bao gồm thay đổi mã đã dùng để chạy thí nghiệm."""
+    """Ghi rõ khi HEAD chưa bao gồm thay đổi ở các tệp mã nghiên cứu."""
     try:
         return bool(
             subprocess.check_output(
-                ["git", "status", "--porcelain"], cwd=PROJECT_DIR, text=True, stderr=subprocess.DEVNULL
+                ["git", "status", "--porcelain", "--", *SOURCE_FILES],
+                cwd=PROJECT_DIR,
+                text=True,
+                stderr=subprocess.DEVNULL,
             ).strip()
         )
     except (OSError, subprocess.CalledProcessError):
@@ -129,10 +132,10 @@ def write_experiment_manifest(
             "models": ["naive_zero", "train_mean", "ridge", "lstm", "mamba"],
         },
         "news_data": {
-            "path": str(news_file),
+            "path": news_file.as_posix(),
             "exists": news_file.is_file(),
             "sha256": sha256_file(news_file) if news_file.is_file() else None,
-            "collection_manifest_path": str(news_manifest_file),
+            "collection_manifest_path": news_manifest_file.as_posix(),
             "collection_manifest_sha256": (
                 sha256_file(news_manifest_file) if news_manifest_file.is_file() else None
             ),

@@ -49,8 +49,10 @@ TARGETS = ("return", "volatility")
 FEATURE_SETS = {
     "market_only": (*BASE_FEATURES, VNINDEX_FEATURE),
     "market_news": (*BASE_FEATURES, VNINDEX_FEATURE, *NEWS_FEATURES),
-    "market_news_no_sentiment": (*BASE_FEATURES, VNINDEX_FEATURE, "news_count"),
-    "market_news_no_count": (*BASE_FEATURES, VNINDEX_FEATURE, "sentiment_score"),
+    # Ablation phải giữ nguyên bộ đặc trưng thị trường của ma trận chính; nếu
+    # quay về OHLCV mức giá thì chênh lệch không còn chỉ do biến tin bị loại.
+    "market_news_no_sentiment": (*STATIONARY_MARKET_FEATURES, "news_count"),
+    "market_news_no_count": (*STATIONARY_MARKET_FEATURES, "sentiment_score"),
     "market_stationary": STATIONARY_MARKET_FEATURES,
     "market_stationary_news": (*STATIONARY_MARKET_FEATURES, *NEWS_FEATURES),
 }

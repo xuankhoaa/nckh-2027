@@ -17,6 +17,7 @@ results/*
 !results/BAO_CAO_KET_QUA.md
 !results/EXPERIMENT_MANIFEST.json
 !results/metrics.csv
+!results/predictions.csv
 !results/group_summary.csv
 !results/group_summary_return_h1_w30.csv
 !results/group_summary_return_h5_w30.csv

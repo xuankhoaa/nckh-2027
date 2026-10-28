@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -117,6 +118,40 @@ def _completed_keys() -> set[tuple[object, ...]]:
     }
 
 
+def _assert_resume_compatible(args: argparse.Namespace, feature_sets: tuple[str, ...]) -> None:
+    """Không cho trộn kết quả khi cấu hình ma trận đã thay đổi."""
+    manifest_path = Path("results/EXPERIMENT_MANIFEST.json")
+    if not manifest_path.is_file():
+        raise FileNotFoundError("Không thể --resume khi thiếu EXPERIMENT_MANIFEST.json.")
+    previous = json.loads(manifest_path.read_text(encoding="utf-8"))["experiment"]
+    requested = {
+        "tickers": list(args.tickers),
+        "seeds": list(args.seeds),
+        "windows": list(args.windows),
+        "targets": list(args.targets),
+        "feature_sets": list(feature_sets),
+        "return_horizons": list(args.return_horizons),
+        "volatility_horizon": args.volatility_horizon,
+        "news_cutoff_hours": list(args.news_cutoff_hours),
+        "tail_weights": list(args.tail_weights),
+        "return_loss": args.return_loss,
+        "volatility_loss": args.volatility_loss,
+        "weight_decay": args.weight_decay,
+        "validation_shrinkage": args.validation_shrinkage,
+        "ridge_alphas": list(args.ridge_alphas),
+        "include_ridge": args.include_ridge,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+    }
+    changed = [name for name, value in requested.items() if previous.get(name) != value]
+    if changed:
+        raise ValueError(
+            "Không thể --resume vì cấu hình khác lần chạy trước ở: "
+            + ", ".join(changed)
+            + ". Hãy chạy ma trận mới không dùng --resume."
+        )
+
+
 def _neural_runs(
     args: argparse.Namespace,
     ticker: str,
@@ -176,6 +211,8 @@ def main() -> None:
     ]))
     if any(_uses_news(name) for name in feature_sets):
         _validate_news_before_reset(args)
+    if args.resume:
+        _assert_resume_compatible(args, feature_sets)
     if not args.keep_results and not args.resume:
         reset_generated_results()
     started_at = datetime.now(timezone.utc).isoformat()

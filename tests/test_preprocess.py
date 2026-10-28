@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from config import TimeSplit
+from config import FEATURE_SETS, STATIONARY_MARKET_FEATURES, TimeSplit
 from preprocess import aggregate_news_features, build_feature_frame, make_sequence_split
 
 
@@ -30,6 +30,18 @@ def write_ohlcv(path: Path, scale: float = 1.0, late_spike: bool = False) -> Non
 
 
 class PreprocessTests(unittest.TestCase):
+    def test_news_ablations_remove_exactly_one_component(self) -> None:
+        """Ablation giữ cùng market features và chỉ bỏ đúng một biến tin."""
+        market = set(STATIONARY_MARKET_FEATURES)
+        self.assertEqual(
+            set(FEATURE_SETS["market_news_no_sentiment"]),
+            market | {"news_count"},
+        )
+        self.assertEqual(
+            set(FEATURE_SETS["market_news_no_count"]),
+            market | {"sentiment_score"},
+        )
+
     def make_data(self, directory: Path, spike: bool = False) -> None:
         write_ohlcv(directory / "VCB.csv", late_spike=spike)
         write_ohlcv(directory / "VNINDEX.csv")

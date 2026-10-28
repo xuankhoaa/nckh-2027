@@ -90,6 +90,26 @@ def assert_experiment_outputs() -> None:
     ]
     if changed_sources:
         raise ValueError(f"Mã nguồn đã khác manifest của lần chạy: {changed_sources}")
+    changed_data = [
+        record["symbol"]
+        for record in manifest.get("data_manifest", {}).get("files", [])
+        if not (Path("data") / f"{record['symbol']}.csv").is_file()
+        or sha256_file(Path("data") / f"{record['symbol']}.csv") != record["sha256"]
+    ]
+    if changed_data:
+        raise ValueError(f"Dữ liệu OHLCV đã khác manifest của lần chạy: {changed_data}")
+    news_info = manifest.get("news_data", {})
+    news_path = Path(str(news_info.get("path", "")).replace("\\", "/"))
+    if not news_path.is_file() or sha256_file(news_path) != news_info.get("sha256"):
+        raise ValueError("Dữ liệu sentiment tin tức đã khác manifest của lần chạy.")
+    collection_manifest = Path(
+        str(news_info.get("collection_manifest_path", "")).replace("\\", "/")
+    )
+    if (
+        not collection_manifest.is_file()
+        or sha256_file(collection_manifest) != news_info.get("collection_manifest_sha256")
+    ):
+        raise ValueError("Manifest thu thập tin tức đã khác lần chạy thực nghiệm.")
     required_metrics = {
         *IDENTITY, "rmse", "mae", "r2_test", "r2_oos",
         "directional_accuracy", "qlike", "ridge_alpha", "shrinkage_alpha",
@@ -125,6 +145,9 @@ def assert_experiment_outputs() -> None:
         raise ValueError("Có metric không có dự báo tương ứng hoặc ngược lại.")
     if not np.isfinite(predictions[["actual_value", "predicted_value"]].to_numpy(dtype=float)).all():
         raise ValueError("Dự báo có giá trị không hữu hạn.")
+    volatility = predictions["target"].eq("volatility")
+    if volatility.any() and not predictions.loc[volatility, "predicted_value"].gt(0).all():
+        raise ValueError("Dự báo volatility phải dương.")
     print(f"Kết quả: {len(metrics)} lần chạy và {len(predictions)} dự báo hợp lệ.")
 
 

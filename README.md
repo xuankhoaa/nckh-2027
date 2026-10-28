@@ -139,7 +139,7 @@ Kết quả được tổng hợp theo từng mã, trung bình và độ lệch 
 
 ## 7. Kết quả chính
 
-Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 25 kiểm thử tự động của kho công khai đều đạt.
+Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 26 kiểm thử tự động của kho công khai đều đạt.
 
 ### 7.1 Return một phiên
 
@@ -275,6 +275,7 @@ Hướng dẫn chi tiết được cung cấp tại [HUONG_DAN_A_Z.md](HUONG_DAN
 ## 11. Đầu ra công bố
 
 - `results/metrics.csv`: metric của từng lần chạy;
+- `results/predictions.csv`: toàn bộ 249.352 dự báo test theo ngày dùng để tái lập metric và kiểm định;
 - `results/per_ticker_summary.csv`: kết quả theo mã và độ lệch chuẩn seed;
 - `results/group_summary.csv`: kết quả toàn nhóm;
 - `results/statistical_tests.csv`: kiểm định HAC so với Train Mean;
@@ -293,9 +294,10 @@ không chuyển giao quyền sở hữu đối với dữ liệu của bên th�
 phải tuân thủ điều khoản của nguồn KBS/Vnstock, Google News và nhà xuất bản gốc.
 Xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Dự báo theo từng ngày và biểu đồ từng seed vẫn không được commit vì có thể tái
-tạo từ snapshot, trong khi các bảng tổng hợp cần cho báo cáo được lưu tại
-`results/`.
+Dự báo test theo từng ngày được commit để người đọc có thể kiểm tra lại metric
+và kiểm định mà không cần huấn luyện lại 568 lượt. Các biểu đồ từng mã–seed và
+checkpoint PhoBERT không được commit vì có thể tái tạo và có dung lượng lớn;
+biểu đồ tổng hợp dùng trong báo cáo vẫn được công bố.
 
 ## 12. Hạn chế và hướng phát triển
 

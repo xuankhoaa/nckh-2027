@@ -16,13 +16,13 @@ Ma trận chính gồm 568 lượt chạy và 249.352 dự báo. Đối với re
 
 ### 1.1 Bối cảnh nghiên cứu
 
-Dự báo thị trường tài chính là bài toán khó do tỷ suất sinh lợi có nhiễu lớn, phân phối thay đổi theo thời gian và chịu tác động của thông tin mới. Trong khi đó, độ biến động thường thể hiện tính dai dẳng, tạo điều kiện thuận lợi hơn cho mô hình chuỗi thời gian. Dữ liệu OHLCV phản ánh diễn biến giao dịch đã xảy ra nhưng không biểu diễn trực tiếp kỳ vọng của nhà đầu tư. Tin tức tài chính có thể bổ sung thông tin về lợi nhuận, nợ xấu, chính sách, xử phạt hoặc thay đổi quản trị trước khi ảnh hưởng được phản ánh đầy đủ vào lịch sử giá.
+Dự báo thị trường tài chính là bài toán khó do tỷ suất sinh lợi có nhiễu lớn, phân phối thay đổi theo thời gian và chịu tác động của thông tin mới. Trong khi đó, độ biến động thường thể hiện tính dai dẳng, tạo điều kiện thuận lợi hơn cho mô hình chuỗi thời gian. Dữ liệu OHLCV phản ánh diễn biến giao dịch đã xảy ra nhưng không biểu diễn trực tiếp kỳ vọng của nhà đầu tư. Tin tức tài chính có thể bổ sung thông tin về lợi nhuận, nợ xấu, chính sách, xử phạt hoặc thay đổi quản trị trước khi ảnh hưởng được phản ánh đầy đủ vào lịch sử giá; vai trò của nội dung truyền thông đối với tâm lý thị trường đã được ghi nhận trong nghiên cứu thực nghiệm [Tetlock, 2007](https://doi.org/10.1111/j.1540-6261.2007.01232.x).
 
 LSTM là mô hình hồi quy tuần tự phổ biến, được thiết kế nhằm xử lý phụ thuộc dài hạn trong chuỗi [Hochreiter và Schmidhuber, 1997](https://doi.org/10.1162/neco.1997.9.8.1735). Mamba sử dụng Selective State Space Model với tham số phụ thuộc đầu vào, cho phép mô hình lựa chọn thông tin cần duy trì hoặc loại bỏ theo thời gian [Gu và Dao, 2023](https://arxiv.org/abs/2312.00752). Nghiên cứu này khảo sát khả năng áp dụng ý tưởng selective state space cho dữ liệu tài chính đa biến ở quy mô phù hợp với một đề tài đại học.
 
 ### 1.2 Lý do lựa chọn đề tài
 
-Các nghiên cứu dự báo return dễ đánh giá quá cao mô hình nếu chỉ báo cáo độ phù hợp trong mẫu hoặc không sử dụng baseline đủ mạnh. Trong đánh giá ngoài mẫu, trung bình lịch sử là một mốc quan trọng; ngay cả mô hình có quan hệ trong mẫu cũng có thể không vượt được mốc này trong thời gian dài [Campbell và Thompson, 2008](https://dash.harvard.edu/entities/publication/73120378-7dd1-6bd4-e053-0100007fdf3b). Vì vậy, nghiên cứu sử dụng Train Mean làm mẫu số của $R^2_{OOS}$ và giữ nguyên các kết quả âm.
+Các nghiên cứu dự báo return dễ đánh giá quá cao mô hình nếu chỉ báo cáo độ phù hợp trong mẫu hoặc không sử dụng baseline đủ mạnh. Trong đánh giá ngoài mẫu, trung bình lịch sử là một mốc quan trọng; ngay cả mô hình có quan hệ trong mẫu cũng có thể không vượt được mốc này trong thời gian dài [Campbell và Thompson, 2008](https://doi.org/10.1093/rfs/hhm055). Vì vậy, nghiên cứu sử dụng Train Mean làm mẫu số của $R^2_{OOS}$ và giữ nguyên các kết quả âm.
 
 Đề tài đồng thời phân biệt hai câu hỏi thường bị trộn lẫn:
 
@@ -239,7 +239,7 @@ $$
 DA=\frac1N\sum_i\mathbf 1[\operatorname{sign}(y_i)=\operatorname{sign}(\hat y_i)].
 $$
 
-Volatility báo cáo QLIKE trên variance. Kiểm định HAC sử dụng chênh lệch squared loss giữa mô hình và Train Mean trên cùng ngày test. Với target nhiều phiên chồng lấn, độ trễ HAC tối thiểu là $H-1$.
+Volatility báo cáo QLIKE trên variance, một hàm mất mát thường dùng khi so sánh dự báo biến động [Patton, 2011](https://doi.org/10.1016/j.jeconom.2010.03.034). Phép so sánh độ chính xác dự báo dùng chuỗi chênh lệch squared loss theo tinh thần Diebold–Mariano và ước lượng phương sai HAC Newey–West [Diebold và Mariano, 1995](https://doi.org/10.1080/07350015.1995.10524599); [Newey và West, 1987](https://doi.org/10.2307/1913610). Với target nhiều phiên chồng lấn, độ trễ HAC tối thiểu là $H-1$. P-value chỉ là bằng chứng bổ sung và chưa điều chỉnh cho nhiều phép thử.
 
 ## 8. Kết quả
 
@@ -334,7 +334,7 @@ Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark se
 
 ## 10. Độ tin cậy và khả năng tái lập
 
-- 25 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ánh xạ sentiment, mô hình, baseline và metric.
+- 26 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, ánh xạ sentiment, mô hình, baseline và metric.
 - Manifest lưu cấu hình, phiên bản môi trường, checksum mã nguồn và checksum dữ liệu.
 - Kết quả gồm 568 định danh duy nhất và 249.352 dự báo hợp lệ.
 - Mọi dự báo volatility đều dương.
@@ -380,6 +380,10 @@ Do đó, đóng góp phù hợp nhất của đề tài không phải là khẳn
 3. Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory*. Neural Computation, 9(8), 1735–1780. https://doi.org/10.1162/NECO.1997.9.8.1735
 4. Nguyen, D. Q., & Nguyen, A. T. (2020). *PhoBERT: Pre-trained language models for Vietnamese*. Findings of EMNLP 2020, 1037–1042. https://doi.org/10.18653/v1/2020.findings-emnlp.92
 5. UnderTheSea NLP. (2017). *UTS2017_Bank: A Vietnamese Banking Domain Dataset for Aspect-Based Sentiment Analysis*. https://huggingface.co/datasets/undertheseanlp/UTS2017_Bank
+6. Tetlock, P. C. (2007). *Giving Content to Investor Sentiment: The Role of Media in the Stock Market*. The Journal of Finance, 62(3), 1139–1168. https://doi.org/10.1111/j.1540-6261.2007.01232.x
+7. Patton, A. J. (2011). *Volatility Forecast Comparison Using Imperfect Volatility Proxies*. Journal of Econometrics, 160(1), 246–256. https://doi.org/10.1016/j.jeconom.2010.03.034
+8. Diebold, F. X., & Mariano, R. S. (1995). *Comparing Predictive Accuracy*. Journal of Business & Economic Statistics, 13(3), 253–263. https://doi.org/10.1080/07350015.1995.10524599
+9. Newey, W. K., & West, K. D. (1987). *A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix*. Econometrica, 55(3), 703–708. https://doi.org/10.2307/1913610
 
 ## Phụ lục: tệp kết quả chính
 
@@ -387,5 +391,6 @@ Do đó, đóng góp phù hợp nhất của đề tài không phải là khẳn
 - [Bảng theo từng mã](../results/per_ticker_summary.csv)
 - [Kiểm định HAC](../results/statistical_tests.csv)
 - [Kiểm định giá trị tin tức](../results/news_value_tests.csv)
+- [Dự báo test theo ngày](../results/predictions.csv)
 - [Manifest thực nghiệm](../results/EXPERIMENT_MANIFEST.json)
 - [Báo cáo kết quả tự sinh](../results/BAO_CAO_KET_QUA.md)
