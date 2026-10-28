@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 checkpoints/
 artifacts/
+.venv/
 
 # Công cụ lấy dữ liệu chỉ giữ cục bộ; repository công bố snapshot và code nghiên cứu.
 get_data.py
@@ -11,8 +12,7 @@ collect_news.py
 tests/test_collect_news.py
 .local_tools/
 
-# Chỉ lưu các kết quả tổng hợp cần cho báo cáo. Dữ liệu dự báo theo ngày và
-# hàng trăm biểu đồ từng lần chạy được tái tạo bằng run_experiments.py.
+# Lưu bảng kết quả và dự báo test; biểu đồ từng lần chạy được tái tạo khi cần.
 results/*
 !results/BAO_CAO_KET_QUA.md
 !results/EXPERIMENT_MANIFEST.json

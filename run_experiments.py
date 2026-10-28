@@ -191,7 +191,7 @@ def _validate_news_before_reset(args: argparse.Namespace) -> None:
     news_path = Path(args.news_path)
     if not news_path.is_file():
         raise FileNotFoundError(
-            f"Thiếu {args.news_path}. Hãy chuẩn bị dữ liệu theo NEWS_DATA_SCHEMA.md, "
+            f"Thiếu {args.news_path}. Hãy chuẩn bị dữ liệu theo docs/NEWS_DATA_SCHEMA.md, "
             "hoặc chạy mốc kỹ thuật bằng --feature-sets market_only."
         )
     news = pd.read_csv(news_path)

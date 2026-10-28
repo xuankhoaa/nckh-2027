@@ -36,6 +36,8 @@ VN-Index được dùng làm biến đại diện cho diễn biến thị trư�
 
 Nghiên cứu thực hiện đồng thời hai trục so sánh. So sánh kiến trúc dùng cùng một tập đầu vào để đối chiếu LSTM với Mamba-style. So sánh dữ liệu giữ nguyên kiến trúc và thay đổi giữa `Market stationary` và `Market stationary + News`.
 
+Sơ đồ quy trình và giải thích các phép so sánh: [Thiết kế nghiên cứu](docs/THIET_KE_NGHIEN_CUU.md).
+
 | Thành phần | Cấu hình |
 |---|---|
 | Baseline hằng | Zero return, Train Mean |
@@ -94,7 +96,7 @@ Hai đặc trưng tin tức được đưa vào mô hình là:
 
 Tin từ 15:00 trở đi, tin cuối tuần và tin ngày nghỉ được chuyển sang phiên giao dịch kế tiếp. Quy tắc này ngăn thông tin xuất hiện sau thời điểm dự báo bị đưa ngược vào quá khứ.
 
-Chi tiết về nguồn, schema, giấy phép và quy trình kiểm tra sentiment được trình bày tại [NEWS_DATA_SCHEMA.md](NEWS_DATA_SCHEMA.md).
+Chi tiết về nguồn, schema, giấy phép và quy trình kiểm tra sentiment được trình bày tại [đặc tả dữ liệu tin tức](docs/NEWS_DATA_SCHEMA.md).
 
 ## 4. Biến mục tiêu
 
@@ -211,7 +213,7 @@ evaluate.py                Metric, bảng tổng hợp và biểu đồ
 generate_report.py         Sinh báo cáo kết quả từ CSV
 verify_project.py          Kiểm tra dữ liệu, schema, hash và số lượt chạy
 tests/                     Kiểm thử tự động
-bao_cao/                   Báo cáo nghiên cứu
+docs/                       Báo cáo, sơ đồ và tài liệu phương pháp
 results/                   Kết quả tổng hợp được công bố
 ```
 
@@ -220,8 +222,14 @@ results/                   Kết quả tổng hợp được công bố
 Các snapshot dữ liệu đã có sẵn nên môi trường huấn luyện không cần Vnstock hoặc API key.
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m pip install -r requirements.txt
+py -3 -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+Trên macOS/Linux: `python3 -m venv .venv`, sau đó chạy
+`.venv/bin/python -m pip install -r requirements.txt`. Các lệnh bên dưới dùng
+Python trong môi trường ảo vừa tạo. Nếu nhóm đã có môi trường riêng, có thể
+thay đường dẫn interpreter tương ứng.
 
 ## 10. Chạy thực nghiệm
 
@@ -234,8 +242,8 @@ truy xuất dữ liệu nguồn không được phân phối trong repository.
 Fine-tune và chấm toàn bộ tiêu đề bằng PhoBERT:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py train
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py score
+& .\.venv\Scripts\python.exe phobert_sentiment.py train
+& .\.venv\Scripts\python.exe phobert_sentiment.py score
 ```
 
 Checkpoint được lưu tại `artifacts/phobert_sentiment/` và không commit vì dung
@@ -246,31 +254,31 @@ chậm; nên dùng GPU trên Google Colab nếu có.
 Kiểm tra file đã chấm và tái tạo manifest:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" phobert_sentiment.py audit
+& .\.venv\Scripts\python.exe phobert_sentiment.py audit
 ```
 
 ### Chạy ma trận chính
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py
+& .\.venv\Scripts\python.exe run_experiments.py
 ```
 
 Tiếp tục một lần chạy bị gián đoạn:
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" run_experiments.py --resume
+& .\.venv\Scripts\python.exe run_experiments.py --resume
 ```
 
 ### Sinh báo cáo và xác minh
 
 ```powershell
-& "$env:USERPROFILE\.venv\Scripts\python.exe" generate_report.py --window 30
-& "$env:USERPROFILE\.venv\Scripts\python.exe" compare_sentiment_methods.py
-& "$env:USERPROFILE\.venv\Scripts\python.exe" -m unittest discover -s tests -v
-& "$env:USERPROFILE\.venv\Scripts\python.exe" verify_project.py --require-results
+& .\.venv\Scripts\python.exe generate_report.py --window 30
+& .\.venv\Scripts\python.exe compare_sentiment_methods.py
+& .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+& .\.venv\Scripts\python.exe verify_project.py --require-results
 ```
 
-Hướng dẫn chi tiết được cung cấp tại [HUONG_DAN_A_Z.md](HUONG_DAN_A_Z.md). Công thức và đặc tả phương pháp nằm trong [CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md](CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md).
+Hướng dẫn chi tiết được cung cấp tại [hướng dẫn A–Z](docs/HUONG_DAN_A_Z.md). Công thức và đặc tả phương pháp nằm trong [tài liệu phương pháp](docs/CONG_THUC_VA_DE_CUONG_BAO_CAO_NCKH.md).
 
 ## 11. Đầu ra công bố
 
@@ -292,7 +300,7 @@ lần thực nghiệm đã công bố. Dữ liệu bao gồm OHLCV, VN-Index, me
 tin, điểm sentiment và các manifest checksum. Việc đưa snapshot vào kho mã
 không chuyển giao quyền sở hữu đối với dữ liệu của bên thứ ba; người sử dụng
 phải tuân thủ điều khoản của nguồn KBS/Vnstock, Google News và nhà xuất bản gốc.
-Xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Xem [ghi chú nguồn dữ liệu và bên thứ ba](docs/THIRD_PARTY_NOTICES.md).
 
 Dự báo test theo từng ngày được commit để người đọc có thể kiểm tra lại metric
 và kiểm định mà không cần huấn luyện lại 568 lượt. Các biểu đồ từng mã–seed và
@@ -312,6 +320,6 @@ biểu đồ tổng hợp dùng trong báo cáo vẫn được công bố.
 
 ## 13. Tài liệu nghiên cứu
 
-Báo cáo đầy đủ: [bao_cao/BAO_CAO_NCKH.md](bao_cao/BAO_CAO_NCKH.md).
+Báo cáo đầy đủ: [docs/BAO_CAO_NCKH.md](docs/BAO_CAO_NCKH.md).
 
 Khi sử dụng kết quả, cần công bố đầy đủ baseline, kết quả âm và giới hạn của nguồn tin; không lựa chọn riêng mã hoặc seed thuận lợi.

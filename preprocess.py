@@ -81,7 +81,7 @@ def aggregate_news_features(
     path = Path(news_path)
     if not path.is_file():
         raise FileNotFoundError(
-            f"Thiếu dữ liệu tin tức {path}. Xem NEWS_DATA_SCHEMA.md; không được thay bằng dữ liệu giả."
+            f"Thiếu dữ liệu tin tức {path}. Xem docs/NEWS_DATA_SCHEMA.md; không được thay bằng dữ liệu giả."
         )
     news = pd.read_csv(path)
     required = {"published_at", "ticker", "sentiment_score"}

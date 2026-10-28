@@ -38,7 +38,7 @@ def assert_source_layout() -> None:
         "compare_sentiment_methods.py",
         "data_quality.py", "preprocess.py",
         "baselines.py", "train.py", "run_experiments.py", "evaluate.py",
-        "generate_report.py", "provenance.py", "NEWS_DATA_SCHEMA.md",
+        "generate_report.py", "provenance.py", "docs/NEWS_DATA_SCHEMA.md",
         "models/lstm.py", "models/mamba_model.py",
     )
     missing = [name for name in expected if not Path(name).is_file()]

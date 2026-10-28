@@ -164,6 +164,25 @@ $$
 
 ## 6. Thiết kế thực nghiệm
 
+Sơ đồ đầy đủ của hai nhánh dữ liệu, hai bài toán và các phép đối chứng được trình bày trong [Hình 1 – Thiết kế nghiên cứu](THIET_KE_NGHIEN_CUU.md#hình-1-sơ-đồ-thiết-kế-nghiên-cứu). Sơ đồ này là căn cứ để phân biệt so sánh kiến trúc với so sánh giá trị tăng thêm của tin tức.
+
+```mermaid
+flowchart LR
+    A[OHLCV và VN-Index] --> C[Đặc trưng thị trường]
+    B[Tiêu đề tin] --> D[PhoBERT: sentiment và số tin]
+    C --> E[Market-only]
+    C --> F[Market + News]
+    D --> F
+    E --> G[Chuỗi 30 phiên]
+    F --> G
+    G --> H[Train ≤ 2023; validation 2024; test ≥ 2025]
+    H --> I[Return 1 phiên; volatility 5 phiên]
+    I --> J[Train Mean, Ridge, LSTM, Mamba-style]
+    J --> K[So sánh theo mã, 5 seed và 8 mã]
+```
+
+*Hình 1. Sơ đồ tóm tắt quy trình thực nghiệm. Sơ đồ chi tiết và quy tắc đối chứng nằm trong tài liệu thiết kế nghiên cứu.*
+
 ### 6.1 Chia dữ liệu
 
 | Tập | Ngày kết thúc target | Vai trò |
