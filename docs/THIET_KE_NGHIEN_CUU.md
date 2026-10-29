@@ -8,21 +8,23 @@ Nghiên cứu kiểm tra (1) mô hình chuỗi có dự báo tỷ suất sinh l�
 
 ```mermaid
 flowchart TD
-    A[8 cổ phiếu ngân hàng: OHLCV<br/>VN-Index, 2020–2026] --> B[Kiểm tra chất lượng<br/>tạo đặc trưng thị trường theo phiên]
-    C[Tiêu đề tin tức có thời gian và mã<br/>Google News RSS, 2020–2026] --> D[PhoBERT fine-tune trên UTS2017_Bank<br/>điểm P(tích cực) − P(tiêu cực)]
-    C --> E[Đếm số tin theo mã và phiên]
-    D --> F[Đồng bộ giờ Việt Nam, cutoff 15:00<br/>tin muộn chuyển sang phiên kế tiếp]
-    E --> F
-    B --> G[Tập Market-only]
-    B --> H[Tập Market + News]
-    F --> H
-    G --> I[Chuỗi đầu vào 30 phiên]
+    A["OHLCV của 8 cổ phiếu ngân hàng và VN-Index, 2020–2026"] --> B["Kiểm tra chất lượng và tạo đặc trưng thị trường theo phiên"]
+    C["Tiêu đề Google News RSS có mã và thời gian xuất bản, 2020–2026"] --> D["Chấm điểm cảm xúc từng tiêu đề bằng PhoBERT"]
+    T["UTS2017_Bank: train để fine-tune, validation để chọn checkpoint"] --> P["Checkpoint PhoBERT đã fine-tune"]
+    P --> D
+    C --> F["Quy đổi giờ Việt Nam; cutoff 15:00; tin muộn sang phiên kế tiếp"]
+    D --> F
+    F --> E["Trung bình điểm cảm xúc và đếm số tin theo mã, phiên"]
+    B --> G["Tập chỉ có đặc trưng thị trường"]
+    B --> H["Tập có đặc trưng thị trường và tin tức"]
+    E --> H
+    G --> I["Chuỗi đầu vào 30 phiên"]
     H --> I
-    I --> J[Hai nhãn tương lai:<br/>return 1 phiên; volatility 5 phiên]
-    J --> K[Chia thời gian theo ngày cuối nhãn<br/>train ≤ 2023; validation 2024; test ≥ 2025]
-    K --> L[Train Mean, Zero Return, Ridge<br/>LSTM, Mamba-style; 5 seed cho mạng]
-    L --> M[Đánh giá ngoài mẫu theo từng mã<br/>RMSE, MAE, R² OOS; DA hoặc QLIKE]
-    M --> N[So sánh kiến trúc và giá trị tin tức<br/>tổng hợp 8 mã, độ lệch chuẩn, HAC]
+    I --> J["Nhãn tương lai: return 1 hoặc 5 phiên; volatility 5 phiên"]
+    J --> K["Chia theo ngày cuối nhãn: train đến 2023; validation 2024; test từ 2025"]
+    K --> L["Train Mean; Zero Return cho return; Ridge; LSTM và Mamba-style với 5 seed"]
+    L --> M["Đánh giá từng mã: RMSE, MAE, R² OOS, DA hoặc QLIKE"]
+    M --> N["So sánh kiến trúc và giá trị tin tức; tổng hợp 8 mã; kiểm định HAC"]
 ```
 
 Hình trên mô tả **thiết kế thí nghiệm đã thực hiện**. PhoBERT chỉ tạo đặc trưng cảm xúc; LSTM và Mamba-style là mô hình dự báo hai nhãn tài chính. Mỗi mã được huấn luyện riêng, nên không có ticker embedding trong mô hình hiện tại.

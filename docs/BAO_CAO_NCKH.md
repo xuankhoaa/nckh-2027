@@ -168,17 +168,17 @@ Sơ đồ đầy đủ của hai nhánh dữ liệu, hai bài toán và các ph�
 
 ```mermaid
 flowchart LR
-    A[OHLCV và VN-Index] --> C[Đặc trưng thị trường]
-    B[Tiêu đề tin] --> D[PhoBERT: sentiment và số tin]
-    C --> E[Market-only]
-    C --> F[Market + News]
+    A["OHLCV và VN-Index"] --> C["Đặc trưng thị trường"]
+    B["Tiêu đề tin"] --> D["Điểm PhoBERT và số tin theo phiên"]
+    C --> E["Market-only"]
+    C --> F["Market + News"]
     D --> F
-    E --> G[Chuỗi 30 phiên]
+    E --> G["Chuỗi 30 phiên"]
     F --> G
-    G --> H[Train ≤ 2023; validation 2024; test ≥ 2025]
-    H --> I[Return 1 phiên; volatility 5 phiên]
-    I --> J[Train Mean, Ridge, LSTM, Mamba-style]
-    J --> K[So sánh theo mã, 5 seed và 8 mã]
+    G --> I["Return 1 hoặc 5 phiên; volatility 5 phiên"]
+    I --> H["Train đến 2023; validation 2024; test từ 2025"]
+    H --> J["Train Mean, Zero Return cho return, Ridge, LSTM, Mamba-style"]
+    J --> K["So sánh theo mã, 5 seed và tổng hợp 8 mã"]
 ```
 
 *Hình 1. Sơ đồ tóm tắt quy trình thực nghiệm. Sơ đồ chi tiết và quy tắc đối chứng nằm trong tài liệu thiết kế nghiên cứu.*
