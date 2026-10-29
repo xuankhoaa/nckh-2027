@@ -10,11 +10,67 @@ import unittest
 import numpy as np
 import pandas as pd
 
+from generate_report import architecture_tests, news_value_tests, statistical_tests
 from run_experiments import _completed_keys
 from verify_project import IDENTITY, assert_metric_reproduction
 
 
 class ReproducibilityTests(unittest.TestCase):
+    def test_report_pairs_all_dates_despite_csv_rounding(self) -> None:
+        common = {
+            "ticker": "VCB", "target": "return", "horizon": 1,
+            "window": 30, "news_cutoff_hour": 15, "tail_weight": 1.0,
+            "loss_name": "huber", "weight_decay": 0.0001,
+            "validation_shrinkage": True, "seed": 42,
+        }
+        rows = []
+        for model, feature_set, forecasts in (
+            ("train_mean", "not_applicable", [0.5, 0.5, 0.5]),
+            ("lstm", "market_stationary", [0.1, 0.9, 1.9]),
+            ("lstm", "market_stationary_news", [0.2, 0.8, 1.8]),
+        ):
+            identity = {**common, "model": model, "feature_set": feature_set}
+            for date, actual, forecast in zip(
+                ["2025-01-02", "2025-01-03", "2025-01-06"],
+                [0.0, 1.0, 2.0], forecasts,
+            ):
+                rows.append({**identity, "date": date, "actual_value": actual,
+                             "predicted_value": forecast})
+        predictions = pd.DataFrame(rows)
+        predictions.loc[predictions.index[-1], "actual_value"] += 1e-12
+        self.assertTrue((statistical_tests(predictions)["n_test"] == 3).all())
+        self.assertEqual(int(news_value_tests(predictions).iloc[0]["n_test"]), 3)
+
+    def test_architecture_comparison_requires_same_test_dates(self) -> None:
+        identity = {
+            "ticker": "VCB", "target": "return", "horizon": 1,
+            "window": 30, "feature_set": "market_stationary",
+            "news_cutoff_hour": 15, "tail_weight": 1.0,
+            "loss_name": "huber", "weight_decay": 0.0001,
+            "validation_shrinkage": True, "seed": 42,
+        }
+        dates = ["2025-01-02", "2025-01-03", "2025-01-06"]
+        rows = [
+            {**identity, "model": model, "date": date,
+             "actual_value": actual, "predicted_value": forecast}
+            for model, forecasts in (("lstm", [1.0, 2.0, 3.0]),
+                                     ("mamba", [0.0, 2.0, 4.0]))
+            for date, actual, forecast in zip(dates, [1.0, 2.0, 3.0], forecasts)
+        ]
+        predictions = pd.DataFrame(rows)
+        result = architecture_tests(predictions)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(int(result.iloc[0]["n_test"]), 3)
+        self.assertLess(result.iloc[0]["mean_squared_error_improvement"], 0)
+        rounded = predictions.copy()
+        rounded.loc[rounded.index[-1], "actual_value"] += 1e-12
+        self.assertEqual(int(architecture_tests(rounded).iloc[0]["n_test"]), 3)
+        rounded.loc[rounded.index[-1], "actual_value"] += 0.1
+        with self.assertRaisesRegex(ValueError, "Nhãn test không khớp"):
+            architecture_tests(rounded)
+        with self.assertRaisesRegex(ValueError, "không ghép đủ"):
+            architecture_tests(predictions.drop(predictions.index[-1]))
+
     def test_resume_requires_both_metrics_and_predictions(self) -> None:
         identity = {
             "model": "mamba", "ticker": "VCB", "target": "return",

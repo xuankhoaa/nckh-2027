@@ -108,12 +108,16 @@ def statistical_tests(predictions: pd.DataFrame) -> pd.DataFrame:
         ]
         paired = frame.merge(
             matching_baseline,
-            on=["ticker", "target", "horizon", "window", "date", "actual_value"],
+            on=["ticker", "target", "horizon", "window", "date"],
             suffixes=("_model", "_baseline"),
             validate="one_to_one",
         )
+        if len(paired) != len(frame) or len(paired) != len(matching_baseline):
+            raise ValueError(f"Ngày test không ghép đủ với Train Mean: {identity}")
+        if not np.allclose(paired["actual_value_model"], paired["actual_value_baseline"], rtol=0, atol=1e-8):
+            raise ValueError(f"Nhãn test không khớp Train Mean: {identity}")
         result = hac_squared_loss_test(
-            paired["actual_value"].to_numpy(),
+            paired["actual_value_model"].to_numpy(),
             paired["predicted_value_model"].to_numpy(),
             paired["predicted_value_baseline"].to_numpy(),
             int(horizon),
@@ -175,13 +179,17 @@ def news_value_tests(predictions: pd.DataFrame) -> pd.DataFrame:
                 on=[
                     "model", "ticker", "target", "horizon", "window",
                     "tail_weight", "loss_name", "weight_decay",
-                    "validation_shrinkage", "seed", "date", "actual_value",
+                    "validation_shrinkage", "seed", "date",
                 ],
                 suffixes=("_news", "_market"),
                 validate="one_to_one",
             )
+            if len(paired) != len(frame) or len(paired) != len(reference):
+                raise ValueError(f"Ngày test không ghép đủ Market+News và Market-only: {identity}")
+            if not np.allclose(paired["actual_value_news"], paired["actual_value_market"], rtol=0, atol=1e-8):
+                raise ValueError(f"Nhãn test không khớp Market-only: {identity}")
             result = hac_squared_loss_test(
-                paired["actual_value"].to_numpy(),
+                paired["actual_value_news"].to_numpy(),
                 paired["predicted_value_news"].to_numpy(),
                 paired["predicted_value_market"].to_numpy(),
                 int(horizon),
@@ -203,6 +211,40 @@ def news_value_tests(predictions: pd.DataFrame) -> pd.DataFrame:
                 "n_test": len(paired),
                 **result,
             })
+    return pd.DataFrame(records)
+
+
+def architecture_tests(predictions: pd.DataFrame) -> pd.DataFrame:
+    """So sánh Mamba-style với LSTM trên cùng mã, ngày test và seed."""
+    keys = [
+        "ticker", "target", "horizon", "window", "feature_set",
+        "news_cutoff_hour", "tail_weight", "loss_name", "weight_decay",
+        "validation_shrinkage", "seed",
+    ]
+    lstm = predictions.loc[predictions["model"].eq("lstm")]
+    mamba = predictions.loc[predictions["model"].eq("mamba")]
+    records: list[dict[str, object]] = []
+    for identity, frame in mamba.groupby(keys):
+        reference = lstm
+        for column, value in zip(keys, identity):
+            reference = reference.loc[reference[column].eq(value)]
+        paired = frame.merge(
+            reference,
+            on=[*keys, "date"],
+            suffixes=("_mamba", "_lstm"),
+            validate="one_to_one",
+        )
+        if len(paired) != len(frame) or len(paired) != len(reference):
+            raise ValueError(f"Ngày test không ghép đủ Mamba-style và LSTM: {identity}")
+        if not np.allclose(paired["actual_value_mamba"], paired["actual_value_lstm"], rtol=0, atol=1e-8):
+            raise ValueError(f"Nhãn test không khớp giữa Mamba-style và LSTM: {identity}")
+        result = hac_squared_loss_test(
+            paired["actual_value_mamba"].to_numpy(),
+            paired["predicted_value_mamba"].to_numpy(),
+            paired["predicted_value_lstm"].to_numpy(),
+            int(identity[2]),
+        )
+        records.append({**dict(zip(keys, identity)), "n_test": len(paired), **result})
     return pd.DataFrame(records)
 
 
@@ -309,6 +351,7 @@ def main() -> None:
     ticker_summary.to_csv(RESULTS_DIR / "per_ticker_summary.csv", index=False)
     tests = statistical_tests(predictions.loc[predictions["window"].eq(args.window)].copy())
     news_tests = news_value_tests(predictions.loc[predictions["window"].eq(args.window)].copy())
+    model_tests = architecture_tests(predictions.loc[predictions["window"].eq(args.window)].copy())
     _vietnamese_values(selected).to_csv(
         RESULTS_DIR / "BANG_KET_QUA_CHI_TIET_VI.csv", index=False, encoding="utf-8-sig"
     )
@@ -326,6 +369,7 @@ def main() -> None:
     )
     tests.to_csv(RESULTS_DIR / "statistical_tests.csv", index=False)
     news_tests.to_csv(RESULTS_DIR / "news_value_tests.csv", index=False)
+    model_tests.to_csv(RESULTS_DIR / "architecture_tests.csv", index=False)
 
     news_counts = (
         news_tests.assign(
@@ -353,6 +397,24 @@ def main() -> None:
         "Cải thiện MSE trung bình"
     ].map(lambda value: f"{value:.8f}")
 
+    model_counts = (
+        model_tests.assign(improved=lambda frame: frame["mean_squared_error_improvement"].gt(0))
+        .groupby(["target", "horizon", "feature_set"], as_index=False)
+        .agg(
+            paired_runs=("seed", "size"),
+            mamba_better=("improved", "sum"),
+            mean_mse_improvement=("mean_squared_error_improvement", "mean"),
+        )
+    )
+    model_counts_display = _vietnamese_values(model_counts).rename(columns={
+        "paired_runs": "Số cặp mã-seed",
+        "mamba_better": "Số cặp Mamba tốt hơn",
+        "mean_mse_improvement": "Cải thiện MSE trung bình",
+    })
+    model_counts_display["Cải thiện MSE trung bình"] = model_counts_display[
+        "Cải thiện MSE trung bình"
+    ].map(lambda value: f"{value:.8f}")
+
     manifest_path = RESULTS_DIR / "EXPERIMENT_MANIFEST.json"
     manifest_note = ""
     if manifest_path.is_file():
@@ -370,10 +432,23 @@ def main() -> None:
         "giá trị cải thiện MSE dương mới có lợi cho mô hình. Hệ số co dự báo được ước lượng chỉ "
         "trên validation, không dùng test. Kết luận phải đồng thời xem từng mã, "
         "trung bình nhóm và độ lệch chuẩn giữa seed.\n\n"
+        "## So sánh trực tiếp Mamba-style với LSTM\n\n"
+        + markdown_table(model_counts_display)
+        + "\n\nMỗi cặp dùng cùng mã, tập đặc trưng, seed và ngày test. Cải thiện MSE dương "
+        "có lợi cho Mamba-style. Các seed trên cùng mã dùng chung chuỗi test, nên số cặp "
+        "không phải số quan sát độc lập; xem `architecture_tests.csv` để đọc kiểm định HAC "
+        "từng cặp, chưa điều chỉnh nhiều lần.\n\n"
         "## Giá trị tăng thêm của tin tức\n\n"
         + markdown_table(news_counts_display)
         + "\n\nBảng này ghép đúng cùng mô hình, mã và seed. Cải thiện MSE dương nghĩa là "
-        "Market+News tốt hơn Market-only; p-value HAC là bằng chứng bổ sung, chưa điều chỉnh nhiều lần."
+        "Market+News tốt hơn Market-only. Các seed trên cùng mã dùng chung chuỗi test; "
+        "p-value HAC là bằng chứng bổ sung cho từng cặp, chưa điều chỉnh nhiều lần."
+        "\n\n## Giới hạn khi diễn giải\n\n"
+        "PhoBERT được huấn luyện trên phản hồi khách hàng ngân hàng. Cần nhãn người "
+        "cho mẫu tiêu đề chứng khoán để đánh giá đúng miền đích. Metadata RSS được "
+        "truy hồi hồi cứu; thời điểm xuất bản không xác nhận thời điểm bản tin đã "
+        "có sẵn trong chỉ mục lịch sử. Vì vậy kết quả tin tức chưa phải kiểm định "
+        "giao dịch point-in-time."
         + manifest_note
         + "\n"
     )

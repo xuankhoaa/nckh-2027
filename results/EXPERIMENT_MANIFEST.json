@@ -1,8 +1,8 @@
 {
-  "created_at_utc": "2026-10-28T16:40:42.087120+00:00",
-  "started_at_utc": "2026-10-28T16:40:40.818053+00:00",
-  "git_commit": "f34ac3ffa53c4d194b5ad88bdc65892d7935c01b",
-  "git_worktree_dirty": false,
+  "created_at_utc": "2026-10-29T06:45:51.825762+00:00",
+  "started_at_utc": "2026-10-29T06:45:51.759907+00:00",
+  "git_commit": "f621a3467390620fb076934c7de003e88fbdd8b1",
+  "git_worktree_dirty": true,
   "source_sha256": {
     "config.py": "b09823392fb05fc5c7c191dcf25c7d36402082f79ca5357684be705ac4fd4f1c",
     "data_quality.py": "f24b6298d763f18a62eab0440cefff09055840830d877ff5ab33af576c35e9f5",
@@ -13,11 +13,11 @@
     "models/mamba_model.py": "2fd50c247cb1d7e72e21115089d81ca9fc03029a8241a313010f8fe900b8fe72",
     "console.py": "2858e567fd24daad8ae4ff2064b0cc1d10ba6da6f0f743e58ea88f8cc2bf1269",
     "train.py": "ea3418032d6851e370fa6ce8eca0e6021cdc5e7c5a528cf3293ec79d0b7897dc",
-    "evaluate.py": "ff5f7021882763ad28dd60505996253156dfe08989e235d6cf5fe329b3685560",
-    "run_experiments.py": "3cd874667a2c9438f157559da810c1a85f73e714bc22c2c28554f116d957b3c7",
-    "generate_report.py": "8de9163c2553139819149c1c0172ee400ce9af1f79f1a1d852a59ce3eb3a0da6",
+    "evaluate.py": "3747c379fdf52133e2b7e7b156167d5a30447ed98340dd614281f9d19e3be3ac",
+    "run_experiments.py": "9238360d6f7e7092bb07b9b5ce3bfc3b672bd0c6288ce7f9cc2c8b6a1e2ee4fe",
+    "generate_report.py": "d4dedbd3cfc0370ba07adbaeca8a8336caa85d635fc358bce1b3398841bab1a5",
     "compare_sentiment_methods.py": "afe47ba8970d8a80ad1edcb7cb4f8f241540c01dc459c816795466cbb8248db4",
-    "verify_project.py": "6327ffb56127e385d0fd1288e77c355c0f207e9cbf0307e9dd35e71e1eaf3f12"
+    "verify_project.py": "012ba752d14e9245fee5a83bcf1d8d6a5291c231992ee8e0827a7302d1c5098c"
   },
   "python": "3.13.13",
   "platform": "Windows-11-10.0.26300-SP0",
@@ -104,7 +104,7 @@
     "collection_manifest_sha256": "3523f5b5d95912fe63d4eb75c529aa744c94b49f6d738a10bcf14a22c5063b4c"
   },
   "data_manifest": {
-    "created_at_utc": "2026-10-28T16:40:42.080840+00:00",
+    "created_at_utc": "2026-10-29T06:45:51.817769+00:00",
     "source": "KBS",
     "files": [
       {
@@ -174,5 +174,22 @@
     "quality_warnings": [
       "VNINDEX: 3 dòng close nằm ngoài [low, high] từ nguồn dữ liệu; pipeline chỉ dùng close để tính vnindex_return và không tự sửa dữ liệu."
     ]
-  }
+  },
+  "source_sha256_at_start": {
+    "config.py": "b09823392fb05fc5c7c191dcf25c7d36402082f79ca5357684be705ac4fd4f1c",
+    "data_quality.py": "f24b6298d763f18a62eab0440cefff09055840830d877ff5ab33af576c35e9f5",
+    "phobert_sentiment.py": "db8682b5d0fb932889670a4934f8aaac2a8a5c123f9161745fa1131062c73ecf",
+    "preprocess.py": "f687a2cc42fc1de319541ba0bd20cd781f7d0930cf372ccd282466bf0550e4cc",
+    "baselines.py": "3d4cb047375c63f99402514e7df4962f976aa77ded8d078a8d07035f805d8c9e",
+    "models/lstm.py": "d6396f073742a892c574f1d83b6988173c4234b44692a85a60ce680d15f6b397",
+    "models/mamba_model.py": "2fd50c247cb1d7e72e21115089d81ca9fc03029a8241a313010f8fe900b8fe72",
+    "console.py": "2858e567fd24daad8ae4ff2064b0cc1d10ba6da6f0f743e58ea88f8cc2bf1269",
+    "train.py": "ea3418032d6851e370fa6ce8eca0e6021cdc5e7c5a528cf3293ec79d0b7897dc",
+    "evaluate.py": "ff5f7021882763ad28dd60505996253156dfe08989e235d6cf5fe329b3685560",
+    "run_experiments.py": "9238360d6f7e7092bb07b9b5ce3bfc3b672bd0c6288ce7f9cc2c8b6a1e2ee4fe",
+    "generate_report.py": "8de9163c2553139819149c1c0172ee400ce9af1f79f1a1d852a59ce3eb3a0da6",
+    "compare_sentiment_methods.py": "afe47ba8970d8a80ad1edcb7cb4f8f241540c01dc459c816795466cbb8248db4",
+    "verify_project.py": "012ba752d14e9245fee5a83bcf1d8d6a5291c231992ee8e0827a7302d1c5098c"
+  },
+  "execution_notes": "Ma trận 568 lượt hoàn tất qua một lần chạy mới và một lần --resume sau lỗi ghi CSV tại lượt 21. Chỉ cơ chế ghi CSV và biểu đồ/báo cáo thay đổi trong lúc chạy; công thức đặc trưng, mô hình và dự báo không đổi. source_sha256_at_start lưu mã ở đầu lượt chạy; source_sha256 ghi mã cuối cùng để kiểm tra bản công bố."
 }

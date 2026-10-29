@@ -138,10 +138,14 @@ $$
 - $R^2_{OOS}<0$: mô hình kém Train Mean.
 
 Kết quả được tổng hợp theo từng mã, trung bình và độ lệch chuẩn qua 5 seed, sau đó trung bình trên tám mã. Kiểm định HAC so sánh squared loss của từng cấu hình với Train Mean trên cùng ngày test.
+Các so sánh Mamba-style với LSTM và Market + News với Market stationary cũng được
+ghép theo cùng mã, seed và ngày test. Nhiều seed của một mã dùng chung chuỗi test,
+vì vậy số cặp mã–seed không được diễn giải thành số quan sát độc lập. Các p-value
+theo từng cặp chưa điều chỉnh cho nhiều phép thử.
 
 ## 7. Kết quả chính
 
-Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 29 kiểm thử tự động của kho công khai đều đạt.
+Ma trận chính gồm **568 lượt chạy** và **249.352 dự báo**. Toàn bộ 31 kiểm thử tự động của kho công khai đều đạt.
 
 ### 7.1 Return một phiên
 
@@ -178,6 +182,11 @@ Kéo dài horizon không làm xuất hiện năng lực dự báo vượt Train 
 | Mamba-style | Market stationary + PhoBERT News | 0,009826 | 0,007293 | 0,119319 | 0,783877 |
 
 Volatility là bài toán có kết quả tích cực. LSTM Market stationary đạt RMSE thấp nhất và $R^2_{OOS}=0,147791$. Mamba-style cũng vượt Train Mean, nhưng không vượt LSTM ở cấu hình chính.
+
+So sánh ghép cặp trực tiếp trên cùng mã, seed và ngày test cho thấy Mamba-style
+tốt hơn LSTM ở 21/40 cặp return h1 với Market stationary, nhưng chỉ 12/40 cặp
+volatility h5. Xem [bảng so sánh kiến trúc](results/architecture_tests.csv) và
+phần diễn giải trong [báo cáo đầy đủ](docs/BAO_CAO_NCKH.md).
 
 ### 7.4 Giá trị tăng thêm của tin tức
 
@@ -288,6 +297,7 @@ Hướng dẫn chi tiết được cung cấp tại [hướng dẫn A–Z](docs/
 - `results/group_summary.csv`: kết quả toàn nhóm;
 - `results/statistical_tests.csv`: kiểm định HAC so với Train Mean;
 - `results/news_value_tests.csv`: so sánh ghép cặp Market + News với Market-only;
+- `results/architecture_tests.csv`: so sánh ghép cặp Mamba-style với LSTM;
 - `results/sentiment_method_comparison.csv`: so sánh PhoBERT với từ điển và Market-only;
 - `results/phobert_sentiment_metrics.json`: đánh giá PhoBERT trên UTS2017_Bank;
 - `results/lexicon/`: kết quả đối chứng dùng sentiment từ điển;
@@ -314,11 +324,26 @@ biểu đồ tổng hợp dùng trong báo cáo vẫn được công bố.
 - PhoBERT đạt Accuracy 94,53% nhưng Macro-F1 63,42% và không dự đoán đúng mẫu neutral nào trên test UTS2017_Bank; Accuracy đơn lẻ vì vậy dễ gây hiểu nhầm.
 - Chất lượng cả từ điển và PhoBERT cần được xác nhận trên cùng mẫu gán nhãn thủ công bằng Accuracy và Macro-F1.
 - Snapshot Google News có thể thay đổi theo chỉ mục của nhà cung cấp.
+- Return được tính từ cột `close` trong snapshot; nghiên cứu chưa xác nhận riêng
+  việc điều chỉnh cổ tức/chia tách, nên không gọi đó là total return.
+- Thời điểm xuất bản trong snapshot RSS không chứng minh tiêu đề đã có sẵn tại
+  đúng thời điểm lịch sử; cần dữ liệu point-in-time để xác nhận kết quả như một
+  backtest có thể giao dịch thực tế.
 - Mamba-style là mô hình Selective SSM tối giản, không phải bản benchmark chính thức.
 - Return ngắn hạn vẫn chưa vượt Train Mean trên trung bình nhóm.
 - Các hướng mở rộng hợp lý gồm bổ sung nhãn tiêu đề chứng khoán để thích nghi miền cho PhoBERT, mô hình pooled nhiều mã, walk-forward validation và kiểm tra độ nhạy đã đăng ký trước.
 
-## 13. Tài liệu nghiên cứu
+## 13. Việc cần hoàn tất trước bản nộp cuối
+
+1. Hai người gán nhãn độc lập 90 tiêu đề trong `data/news_validation_sample.csv`,
+   thống nhất nhãn bất đồng và báo cáo Accuracy, Macro-F1, ma trận nhầm lẫn của
+   PhoBERT và từ điển trên đúng mẫu này. Hiện cột `human_label` còn trống.
+2. Xác nhận quyền công bố các snapshot OHLCV và metadata tin theo điều khoản
+   của từng nguồn. Ghi lại bằng chứng hoặc giới hạn phạm vi chia sẻ nếu cần.
+3. Khi trình bày, gọi kết quả tin tức là đánh giá hồi cứu theo thời điểm xuất bản;
+   chỉ gọi là backtest thời gian thực khi có dữ liệu point-in-time.
+
+## 14. Tài liệu nghiên cứu
 
 Báo cáo đầy đủ: [docs/BAO_CAO_NCKH.md](docs/BAO_CAO_NCKH.md).
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import time
 from pathlib import Path
 
 import matplotlib
@@ -72,6 +74,7 @@ def reset_generated_results() -> None:
         "predictions.csv",
         "statistical_tests.csv",
         "news_value_tests.csv",
+        "architecture_tests.csv",
         "BAO_CAO_KET_QUA.md",
         "BANG_KET_QUA_CHI_TIET_VI.csv",
         "BANG_TONG_HOP_NHOM_VI.csv",
@@ -91,14 +94,26 @@ def reset_generated_results() -> None:
 
 
 def _upsert_csv(path: Path, new_rows: pd.DataFrame, keys: list[str]) -> None:
-    """Thay đúng cùng định danh run, không cộng dồn trùng lặp khi chạy lại."""
+    """Thay đúng run bằng ghi nguyên tử để lần chạy gián đoạn vẫn tiếp tục được."""
     if path.exists():
         old_rows = pd.read_csv(path)
         if not set(keys).issubset(old_rows.columns):
             raise ValueError(f"{path} không cùng schema; hãy chạy lại không dùng --keep-results.")
         markers = old_rows.merge(new_rows.loc[:, keys].drop_duplicates(), on=keys, how="left", indicator=True)["_merge"]
         new_rows = pd.concat([old_rows.loc[markers.eq("left_only")], new_rows], ignore_index=True)
-    new_rows.to_csv(path, index=False)
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        new_rows.to_csv(temporary, index=False)
+        for attempt in range(10):
+            try:
+                os.replace(temporary, path)
+                break
+            except OSError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.2)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def save_experiment_outputs(
@@ -268,14 +283,38 @@ def save_group_summary(window: int, target: str, horizon: int) -> pd.DataFrame:
 def plot_group_metric_comparison(window: int, target: str, horizon: int) -> None:
     summary = save_group_summary(window, target, horizon)
     GROUP_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    target_metrics = (("rmse", "RMSE trung bình"), ("mae", "MAE trung bình"))
+    target_metrics = (("rmse", "RMSE trung bình"), ("mae", "MAE trung bình"),
+                      ("r2_oos", "R² ngoài mẫu so với Train Mean"))
     target_metrics += (("directional_accuracy", "Độ chính xác hướng trung bình"),) if target == "return" else (("qlike", "QLIKE trung bình"),)
     for metric, title in target_metrics:
-        figure, axis = plt.subplots(figsize=(9, 4))
-        labels = summary["model"] + "\n" + summary["feature_set"]
-        axis.bar(labels, summary[f"{metric}_mean"], yerr=summary[f"{metric}_std_ticker"], capsize=4)
-        axis.set(title=f"{title} - {target}", xlabel="Mô hình / tập đặc trưng", ylabel=metric)
-        axis.tick_params(axis="x", labelrotation=20)
+        figure, axis = plt.subplots(figsize=(11, 5))
+        model_labels = {
+            "naive_zero": "Zero Return", "train_mean": "Train Mean",
+            "ridge": "Ridge", "lstm": "LSTM", "mamba": "Mamba-style",
+        }
+        feature_labels = {
+            "not_applicable": "Mốc hằng", "market_stationary": "Thị trường",
+            "market_stationary_news": "Thị trường + tin",
+            "market_only": "Thị trường", "market_news": "Thị trường + tin",
+        }
+        labels = [
+            f"{model_labels.get(model, model)}\n{feature_labels.get(feature, feature)}"
+            for model, feature in zip(summary["model"], summary["feature_set"])
+        ]
+        values = summary[f"{metric}_mean"]
+        colors = (
+            ["#18794e" if value > 0 else "#b4494a" for value in values]
+            if metric == "r2_oos" else "#2878b5"
+        )
+        axis.bar(labels, values, yerr=summary[f"{metric}_std_ticker"], capsize=4, color=colors)
+        target_name = "tỷ suất sinh lợi" if target == "return" else "độ biến động"
+        axis.set(
+            title=f"{title} - {target_name} {horizon} phiên\nThanh lỗi: ±1 độ lệch chuẩn giữa 8 mã",
+            ylabel="R² OOS" if metric == "r2_oos" else metric.upper(),
+        )
+        if metric == "r2_oos":
+            axis.axhline(0, color="black", linewidth=0.8)
+        axis.tick_params(axis="x", labelsize=8)
         figure.tight_layout()
         figure.savefig(GROUP_PLOTS_DIR / f"group_{target}_{metric}_h{horizon}_w{window}.png", dpi=160)
         plt.close(figure)

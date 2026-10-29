@@ -28,6 +28,7 @@ results/*
 !results/per_ticker_summary_volatility_h5_w30.csv
 !results/statistical_tests.csv
 !results/news_value_tests.csv
+!results/architecture_tests.csv
 !results/phobert_sentiment_metrics.json
 !results/sentiment_method_comparison.csv
 !results/lexicon/

@@ -131,6 +131,11 @@ nên báo cáo thêm mức đồng thuận; khi bất đồng thì thảo luận
 
 Không thay tin thiếu bằng dữ liệu giả, không dùng thời điểm thu thập thay cho
 thời điểm xuất bản và không chọn lại từ điển/siêu tham số dựa trên kết quả test.
+Snapshot RSS được truy hồi hồi cứu: `published_at` chỉ là thời điểm xuất bản do
+nguồn khai báo, không chứng minh tiêu đề đã có trong chỉ mục tại đúng phiên lịch
+sử. Muốn diễn giải kết quả như backtest có thể thực hiện theo thời gian thực,
+cần lưu dấu vết truy hồi point-in-time hoặc kiểm chứng trên dữ liệu tin có lịch
+sử khả dụng được cấp phép.
 
 ## Dùng nguồn khác
 

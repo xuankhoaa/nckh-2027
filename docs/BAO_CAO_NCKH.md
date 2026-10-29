@@ -6,7 +6,7 @@
 
 Nghiên cứu đánh giá khả năng dự báo tỷ suất sinh lợi và độ biến động của tám cổ phiếu ngân hàng Việt Nam bằng mô hình chuỗi đa biến. Hai kiến trúc được khảo sát là Long Short-Term Memory (LSTM) và một Selective State Space Model tối giản lấy cảm hứng từ Mamba. Dữ liệu đầu vào gồm các đặc trưng thị trường có tính ổn định và hai đặc trưng tin tức: điểm cảm xúc PhoBERT trung bình và số lượng tiêu đề theo mã cổ phiếu, phiên giao dịch. PhoBERT-base-v2 được fine-tune trên UTS2017_Bank, sau đó dùng xác suất ba lớp để tạo điểm $P(positive)-P(negative)$. Dữ liệu thị trường và tin tức bao phủ giai đoạn 2020–2026; tập dữ liệu tin sau lọc gồm 14.090 tiêu đề. Mẫu được chia theo thời gian thành train, validation và test để hạn chế rò rỉ thông tin. Các mô hình được đánh giá với Train Mean, Zero Return và Ridge, sử dụng RMSE, MAE, $R^2_{OOS}$, Directional Accuracy và QLIKE.
 
-Ma trận chính gồm 568 lượt chạy và 249.352 dự báo. Đối với return một phiên, cấu hình Mamba-style kết hợp PhoBERT đạt RMSE 0,018930 và $R^2_{OOS}=-0,000890$, tiến gần nhưng chưa vượt Train Mean. Kết quả return 5 phiên cũng chưa vượt baseline. Đối với volatility 5 phiên, LSTM dùng dữ liệu thị trường đạt RMSE 0,009671 và $R^2_{OOS}=0,147791$, là cấu hình tốt nhất. Việc bổ sung đặc trưng PhoBERT không tạo cải thiện ổn định trên đa số mã và seed, đồng thời không thắng sentiment từ điển một cách nhất quán. Kết quả cho thấy volatility dễ dự báo hơn return trong phạm vi dữ liệu hiện có; đồng thời nhấn mạnh yêu cầu đánh giá nghiêm ngặt đối với chất lượng sentiment trước khi kết luận về giá trị của tin tức.
+Ma trận chính gồm 568 lượt chạy và 249.352 dự báo. Đối với return một phiên, cấu hình Mamba-style kết hợp PhoBERT đạt RMSE 0,018930 và $R^2_{OOS}=-0,000890$, tiến gần nhưng chưa vượt Train Mean. Kết quả return 5 phiên cũng chưa vượt baseline. Đối với volatility 5 phiên, LSTM dùng dữ liệu thị trường đạt RMSE 0,009671 và $R^2_{OOS}=0,147791$, là cấu hình tốt nhất. Việc bổ sung đặc trưng PhoBERT không tạo cải thiện ổn định trên đa số mã và seed, đồng thời không thắng sentiment từ điển một cách nhất quán. So với cùng mốc Train Mean, các mô hình học được thể hiện lợi thế ở bài toán volatility nhưng chưa có lợi thế ở bài toán return trong phạm vi dữ liệu này. Chất lượng sentiment cần được đánh giá trên tiêu đề chứng khoán do người gán nhãn trước khi đưa ra kết luận mạnh về giá trị của tin tức.
 
 **Từ khóa:** Mamba, Selective State Space Model, LSTM, cổ phiếu ngân hàng, tỷ suất sinh lợi, độ biến động, sentiment, dữ liệu đa nguồn.
 
@@ -258,7 +258,7 @@ $$
 DA=\frac1N\sum_i\mathbf 1[\operatorname{sign}(y_i)=\operatorname{sign}(\hat y_i)].
 $$
 
-Volatility báo cáo QLIKE trên variance, một hàm mất mát thường dùng khi so sánh dự báo biến động [Patton, 2011](https://doi.org/10.1016/j.jeconom.2010.03.034). Phép so sánh độ chính xác dự báo dùng chuỗi chênh lệch squared loss theo tinh thần Diebold–Mariano và ước lượng phương sai HAC Newey–West [Diebold và Mariano, 1995](https://doi.org/10.1080/07350015.1995.10524599); [Newey và West, 1987](https://doi.org/10.2307/1913610). Với target nhiều phiên chồng lấn, độ trễ HAC tối thiểu là $H-1$. P-value chỉ là bằng chứng bổ sung và chưa điều chỉnh cho nhiều phép thử.
+Volatility báo cáo QLIKE trên variance, một hàm mất mát thường dùng khi so sánh dự báo biến động [Patton, 2011](https://doi.org/10.1016/j.jeconom.2010.03.034). Phép so sánh độ chính xác dự báo dùng chuỗi chênh lệch squared loss theo tinh thần Diebold–Mariano và ước lượng phương sai HAC Newey–West [Diebold và Mariano, 1995](https://doi.org/10.1080/07350015.1995.10524599); [Newey và West, 1987](https://doi.org/10.2307/1913610). Với target nhiều phiên chồng lấn, độ trễ HAC tối thiểu là $H-1$. P-value chỉ là bằng chứng bổ sung cho từng cặp và chưa điều chỉnh cho nhiều phép thử. Nhiều seed của cùng mã dùng chung chuỗi ngày test, nên không thể coi 40 cặp mã–seed là 40 quan sát độc lập.
 
 ## 8. Kết quả
 
@@ -306,7 +306,27 @@ Kéo dài horizon lên 5 phiên chưa giúp các mô hình vượt Train Mean tr
 
 Các mô hình học được đều có $R^2_{OOS}$ dương ở cấp nhóm. LSTM Market stationary tốt nhất theo RMSE và $R^2_{OOS}$. Mamba-style Market stationary đứng sau LSTM, do đó kết quả không ủng hộ khẳng định Mamba tốt hơn LSTM trong cấu hình hiện tại.
 
-### 8.4 Giá trị tăng thêm của tin tức
+### 8.4 So sánh trực tiếp Mamba-style và LSTM
+
+Mỗi cặp ghép cùng mã, seed, tập đặc trưng và 439 ngày test. Cột cải thiện MSE
+là MSE của LSTM trừ MSE của Mamba-style; số dương có lợi cho Mamba-style.
+
+| Bài toán | Tập đặc trưng | Mamba-style tốt hơn / 40 cặp | Cải thiện MSE trung bình |
+|---|---|---:|---:|
+| Return h1 | Market stationary | 21/40 | 0,00000076 |
+| Return h1 | Market stationary + News | 25/40 | 0,00000120 |
+| Return h5 | Market stationary | 16/40 | 0,00000922 |
+| Return h5 | Market stationary + News | 14/40 | 0,00000504 |
+| Volatility h5 | Market stationary | 12/40 | -0,00000194 |
+| Volatility h5 | Market stationary + News | 13/40 | -0,00000084 |
+
+Ưu thế của Mamba-style không ổn định giữa các bài toán. Ở volatility, LSTM tốt
+hơn trên đa số cặp. Các cặp của cùng mã có chung chuỗi test nên không phải
+40 quan sát độc lập; p-value HAC từng cặp nằm trong
+[`architecture_tests.csv`](../results/architecture_tests.csv) và chưa điều chỉnh
+cho nhiều phép thử.
+
+### 8.5 Giá trị tăng thêm của tin tức
 
 | Target | Mô hình | News tốt hơn | Tổng số cặp mã–seed | Cải thiện MSE trung bình |
 |---|---|---:|---:|---:|
@@ -321,19 +341,25 @@ Giá trị dương ở cột cuối có lợi cho news. Chỉ Mamba return h5 v�
 
 So với sentiment từ điển, PhoBERT cũng không thắng nhất quán. Với Mamba-style, PhoBERT có RMSE thấp hơn từ điển ở 15/40 cặp return h1, 10/40 cặp return h5 và 17/40 cặp volatility. Chênh lệch RMSE trung bình giữa hai phương pháp rất nhỏ. Kết quả cho thấy một mô hình NLP phức tạp hơn không tự động tạo tín hiệu dự báo tài chính tốt hơn khi dữ liệu fine-tune khác miền và lệch lớp.
 
-### 8.5 Biểu đồ
+### 8.6 Biểu đồ
 
 ![RMSE return một phiên](../results/bieu_do/tong_hop/group_return_rmse_h1_w30.png)
+
+![R² OOS return một phiên](../results/bieu_do/tong_hop/group_return_r2_oos_h1_w30.png)
 
 ![RMSE return năm phiên](../results/bieu_do/tong_hop/group_return_rmse_h5_w30.png)
 
 ![RMSE volatility năm phiên](../results/bieu_do/tong_hop/group_volatility_rmse_h5_w30.png)
 
+![R² OOS volatility năm phiên](../results/bieu_do/tong_hop/group_volatility_r2_oos_h5_w30.png)
+
+Thanh lỗi trong các hình là ±1 độ lệch chuẩn giữa tám mã, không phải khoảng tin cậy.
+
 ## 9. Thảo luận
 
 ### 9.1 Khả năng dự báo return
 
-Return ngắn hạn có tỷ lệ tín hiệu trên nhiễu thấp. Forecast shrinkage làm giảm đáng kể mức thua baseline so với cấu hình mạng không regularize, nhưng không tạo ra $R^2_{OOS}$ dương trên trung bình tám mã. Kết quả này phù hợp với yêu cầu thận trọng trong dự báo return ngoài mẫu: một mô hình phức tạp không mặc nhiên tốt hơn dự báo trung bình lịch sử.
+Return ngắn hạn có tỷ lệ tín hiệu trên nhiễu thấp. Cấu hình có forecast shrinkage được chọn trên validation vẫn không tạo ra $R^2_{OOS}$ dương trên trung bình tám mã. Ma trận chính không có đối chứng bỏ riêng shrinkage, nên không quy kết mức chênh lệch với baseline cho thành phần này.
 
 Kết quả âm vẫn có giá trị khoa học. Nó cho thấy các đặc trưng kỹ thuật và sentiment hiện tại chưa đủ để tạo năng lực dự báo return ổn định, đồng thời ngăn việc chọn riêng seed hoặc mã thuận lợi để đưa ra kết luận quá mức.
 
@@ -353,22 +379,29 @@ Không thể kết luận nguyên nhân nào đúng nếu chưa có benchmark se
 
 ## 10. Độ tin cậy và khả năng tái lập
 
-- 29 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, checksum đa nền tảng, ánh xạ sentiment, tiếp tục sau gián đoạn, mô hình, baseline và metric.
+- 31 kiểm thử tự động của kho công khai kiểm tra target, leakage, cutoff tin, ablation, checksum đa nền tảng, ánh xạ sentiment, tiếp tục sau gián đoạn, phép ghép cặp mô hình, baseline và metric.
 - Manifest lưu cấu hình, phiên bản môi trường, checksum mã nguồn và checksum dữ liệu.
 - Kết quả gồm 568 định danh duy nhất và 249.352 dự báo hợp lệ.
 - Mọi dự báo volatility đều dương.
 - Báo cáo có bảng từng mã, độ lệch chuẩn seed, tổng hợp nhóm và kiểm định HAC.
-- `verify_project.py --require-results` xác nhận đầy đủ số lượt chạy, đối chiếu checksum dữ liệu và mã nguồn ảnh hưởng đến dự báo, rồi tính lại metric từ từng dự báo test. Manifest gốc vẫn lưu hash của toàn bộ mã lúc huấn luyện; hai công cụ điều phối và xác minh được sửa sau lần chạy công bố nên hash của chúng khác bản gốc.
+- `verify_project.py --require-results` xác nhận đầy đủ số lượt chạy, đối chiếu checksum dữ liệu và mã nguồn ảnh hưởng đến dự báo, rồi tính lại metric từ từng dự báo test.
 
 ## 11. Hạn chế
 
 1. UTS2017_Bank là phản hồi khách hàng, không phải tiêu đề chứng khoán; neutral chỉ chiếm khoảng 1–2% và PhoBERT không dự đoán đúng neutral trên test chính thức.
 2. Mẫu 90 tiêu đề chưa được gán nhãn thủ công, nên chưa có Accuracy và Macro-F1 trên đúng miền tin chứng khoán.
-3. Google News RSS là chỉ mục động; kết quả truy hồi trong tương lai có thể khác snapshot hiện tại.
-4. Selective SSM là bản Mamba-style nhỏ, không phải triển khai Mamba chính thức.
-5. Mỗi mã được huấn luyện riêng, chưa khai thác cấu trúc liên mã bằng mô hình pooled.
-6. Chưa thực hiện walk-forward retraining hoặc đánh giá chi phí giao dịch.
-7. Kết quả chỉ áp dụng cho tập tám cổ phiếu và giai đoạn quan sát; không nên ngoại suy trực tiếp sang ngành khác.
+3. Metadata RSS được truy hồi hồi cứu. `published_at` là thời điểm nguồn khai báo,
+   không xác nhận thời điểm bản tin đã xuất hiện trong nguồn dữ liệu lịch sử;
+   vì vậy phép ghép tin theo cutoff là kiểm soát theo timestamp công bố, chưa
+   đủ để khẳng định mô phỏng giao dịch theo dữ liệu point-in-time.
+4. Google News RSS là chỉ mục động; kết quả truy hồi trong tương lai có thể khác snapshot hiện tại.
+5. Selective SSM là bản Mamba-style nhỏ, không phải triển khai Mamba chính thức.
+6. Mỗi mã được huấn luyện riêng, chưa khai thác cấu trúc liên mã bằng mô hình pooled.
+7. Chưa thực hiện walk-forward retraining hoặc đánh giá chi phí giao dịch.
+8. Kết quả chỉ áp dụng cho tập tám cổ phiếu và giai đoạn quan sát; không nên ngoại suy trực tiếp sang ngành khác.
+9. Return được tính từ cột `close` của snapshot KBS. Chưa có đối chiếu riêng
+   việc điều chỉnh cổ tức, chia tách và thay đổi đơn vị giá với nguồn gốc, nên
+   không diễn giải đây là total return bao gồm cổ tức.
 
 ## 12. Kết luận
 
@@ -409,6 +442,7 @@ Do đó, đóng góp phù hợp nhất của đề tài không phải là khẳn
 - [Bảng tổng hợp toàn nhóm](../results/group_summary.csv)
 - [Bảng theo từng mã](../results/per_ticker_summary.csv)
 - [Kiểm định HAC](../results/statistical_tests.csv)
+- [So sánh trực tiếp Mamba-style và LSTM](../results/architecture_tests.csv)
 - [Kiểm định giá trị tin tức](../results/news_value_tests.csv)
 - [Dự báo test theo ngày](../results/predictions.csv)
 - [Manifest thực nghiệm](../results/EXPERIMENT_MANIFEST.json)

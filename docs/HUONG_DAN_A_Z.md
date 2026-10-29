@@ -141,7 +141,7 @@ Nếu một lần chạy bị gián đoạn sau khi đã ghi một phần kết 
 ```
 
 Manifest được ghi trước lượt chạy đầu tiên. Chế độ này chỉ bỏ qua lượt có cả
-metric và dự báo; cấu hình và file tin phải trùng lần chạy trước.
+metric và dự báo; cấu hình, dữ liệu thị trường và file tin phải trùng lần chạy trước.
 
 ## 8. Sinh và đọc báo cáo
 
@@ -154,6 +154,9 @@ metric và dự báo; cấu hình và file tin phải trùng lần chạy trư�
 - RMSE/MAE/QLIKE càng thấp càng tốt; R² càng cao càng tốt.
 - Luôn xem mean ± std qua seed, từng mã và toàn nhóm.
 - Kiểm định HAC dùng Train Mean làm mốc; cải thiện MSE dương nghĩa là mô hình tốt hơn.
+- `architecture_tests.csv` ghép Mamba-style với LSTM theo mã, seed và ngày test;
+  `news_value_tests.csv` ghép Market + News với Market stationary. P-value là
+  theo từng cặp, chưa điều chỉnh nhiều phép thử; các seed của cùng mã không độc lập.
 
 ## 9. Kiểm tra trước khi nộp
 
