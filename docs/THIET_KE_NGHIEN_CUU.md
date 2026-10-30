@@ -4,30 +4,13 @@
 
 Nghiên cứu kiểm tra (1) mô hình chuỗi có dự báo tỷ suất sinh lợi và độ biến động ngoài mẫu tốt hơn các mốc đơn giản hay không; (2) kiến trúc Selective SSM lấy cảm hứng từ Mamba có lợi thế so với LSTM khi dùng cùng đầu vào hay không; và (3) cảm xúc cùng số lượng tin tức có đóng góp thêm so với chỉ dùng dữ liệu thị trường hay không.
 
-## Hình 1. Sơ đồ thiết kế nghiên cứu
+## Hình 1. Ma trận đối chứng của thí nghiệm chính
 
-```mermaid
-flowchart TD
-    A["OHLCV của 8 cổ phiếu ngân hàng và VN-Index, 2020–2026"] --> B["Kiểm tra chất lượng và tạo đặc trưng thị trường theo phiên"]
-    C["Tiêu đề Google News RSS có mã và thời gian xuất bản, 2020–2026"] --> D["Chấm điểm cảm xúc từng tiêu đề bằng PhoBERT"]
-    T["UTS2017_Bank: train để fine-tune, validation để chọn checkpoint"] --> P["Checkpoint PhoBERT đã fine-tune"]
-    P --> D
-    C --> F["Quy đổi giờ Việt Nam; cutoff 15:00; tin muộn sang phiên kế tiếp"]
-    D --> F
-    F --> E["Trung bình điểm cảm xúc và đếm số tin theo mã, phiên"]
-    B --> G["Tập chỉ có đặc trưng thị trường"]
-    B --> H["Tập có đặc trưng thị trường và tin tức"]
-    E --> H
-    G --> I["Chuỗi đầu vào 30 phiên"]
-    H --> I
-    I --> J["Nhãn tương lai: return 1 hoặc 5 phiên; volatility 5 phiên"]
-    J --> K["Chia theo ngày cuối nhãn: train đến 2023; validation 2024; test từ 2025"]
-    K --> L["Train Mean; Zero Return cho return; Ridge; LSTM và Mamba-style với 5 seed"]
-    L --> M["Đánh giá từng mã: RMSE, MAE, R² OOS, DA hoặc QLIKE"]
-    M --> N["So sánh kiến trúc và giá trị tin tức; tổng hợp 8 mã; kiểm định HAC"]
-```
+![Ma trận hai tập đặc trưng và hai kiến trúc của thí nghiệm chính](figures/thiet_ke_doi_chung.svg)
 
-Hình trên mô tả **thiết kế thí nghiệm đã thực hiện**. PhoBERT chỉ tạo đặc trưng cảm xúc; LSTM và Mamba-style là mô hình dự báo hai nhãn tài chính. Mỗi mã được huấn luyện riêng, nên không có ticker embedding trong mô hình hiện tại.
+*Hình 1. Mỗi ô gồm 8 mã × 5 seed × 3 bài toán, tương ứng 120 lượt chạy; bốn ô có 480 lượt chạy. Thêm 88 lượt của Train Mean, Zero Return và Ridge, ma trận chính có 568 lượt. So sánh hai ô cùng cột (cùng kiến trúc) để đo giá trị tăng thêm của tin; so sánh hai ô cùng hàng (cùng tập đặc trưng) để đối chiếu LSTM với Mamba-style.*
+
+PhoBERT chỉ tạo điểm cảm xúc; số tin được đếm riêng. Mỗi mã được huấn luyện riêng, nên không có ticker embedding trong mô hình hiện tại. Những bước xử lý dữ liệu và đánh giá không thể hiện trên hình được mô tả ở các mục dưới đây.
 
 ## Quy tắc để các phép so sánh có ý nghĩa
 

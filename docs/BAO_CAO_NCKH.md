@@ -164,24 +164,11 @@ $$
 
 ## 6. Thiết kế thực nghiệm
 
-Sơ đồ đầy đủ của hai nhánh dữ liệu, hai bài toán và các phép đối chứng được trình bày trong [Hình 1 – Thiết kế nghiên cứu](THIET_KE_NGHIEN_CUU.md#hình-1-sơ-đồ-thiết-kế-nghiên-cứu). Sơ đồ này là căn cứ để phân biệt so sánh kiến trúc với so sánh giá trị tăng thêm của tin tức.
+Ma trận hai tập đặc trưng × hai kiến trúc của thí nghiệm chính được trình bày ở Hình 1. Mỗi phép so sánh chỉ thay đổi một trục của ma trận; quy tắc ghép cặp được giải thích trong [tài liệu thiết kế nghiên cứu](THIET_KE_NGHIEN_CUU.md).
 
-```mermaid
-flowchart LR
-    A["OHLCV và VN-Index"] --> C["Đặc trưng thị trường"]
-    B["Tiêu đề tin"] --> D["Điểm PhoBERT và số tin theo phiên"]
-    C --> E["Market-only"]
-    C --> F["Market + News"]
-    D --> F
-    E --> G["Chuỗi 30 phiên"]
-    F --> G
-    G --> I["Return 1 hoặc 5 phiên; volatility 5 phiên"]
-    I --> H["Train đến 2023; validation 2024; test từ 2025"]
-    H --> J["Train Mean, Zero Return cho return, Ridge, LSTM, Mamba-style"]
-    J --> K["So sánh theo mã, 5 seed và tổng hợp 8 mã"]
-```
+![Ma trận hai tập đặc trưng và hai kiến trúc của thí nghiệm chính](figures/thiet_ke_doi_chung.svg)
 
-*Hình 1. Sơ đồ tóm tắt quy trình thực nghiệm. Sơ đồ chi tiết và quy tắc đối chứng nằm trong tài liệu thiết kế nghiên cứu.*
+*Hình 1. Bốn cấu hình mô hình chuỗi có 120 lượt chạy mỗi cấu hình, tổng cộng 480 lượt; 88 lượt còn lại là các mốc đơn giản và Ridge. Tin được ghép theo cutoff 15:00, nhãn và tập train/validation/test được xác định theo quy trình ở mục 5–6.*
 
 ### 6.1 Chia dữ liệu
 

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">Thiết kế đối chứng của thí nghiệm chính</title>
+  <desc id="desc">Hai tập đặc trưng thị trường và thị trường cộng tin tức được thử với LSTM và Mamba-style. Mỗi cấu hình có 120 lượt chạy. Kết quả được đánh giá ngoài mẫu trên ba bài toán.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #202a33; }
+      .title { font-size: 25px; font-weight: 700; }
+      .subtitle { font-size: 15px; fill: #50606d; }
+      .section { font-size: 14px; font-weight: 700; letter-spacing: 1.2px; fill: #27475f; }
+      .label { font-size: 18px; font-weight: 700; }
+      .body { font-size: 15px; }
+      .small { font-size: 13px; fill: #50606d; }
+      .count { font-size: 23px; font-weight: 700; fill: #27475f; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#788895"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="610" fill="#ffffff"/>
+  <rect x="45" y="42" width="5" height="47" fill="#27475f"/>
+  <text x="66" y="66" class="title">Thiết kế đối chứng của thí nghiệm chính</text>
+  <text x="66" y="91" class="subtitle">8 cổ phiếu ngân hàng · cửa sổ 30 phiên · 5 seed cho mỗi mô hình chuỗi</text>
+  <line x1="45" y1="112" x2="1155" y2="112" stroke="#c7d0d7" stroke-width="1"/>
+
+  <text x="45" y="153" class="section">01  DỮ LIỆU</text>
+  <rect x="45" y="185" width="275" height="104" rx="3" fill="#f6f8f9" stroke="#aebbc5"/>
+  <text x="62" y="217" class="label">Thị trường</text>
+  <text x="62" y="243" class="body">OHLCV từ KBS: 8 mã ngân hàng</text>
+  <text x="62" y="267" class="body">và VN-Index, 2020–2026</text>
+
+  <rect x="45" y="316" width="275" height="104" rx="3" fill="#f6f8f9" stroke="#aebbc5"/>
+  <text x="62" y="348" class="label">Tin tức</text>
+  <text x="62" y="374" class="body">Tiêu đề Google News RSS</text>
+  <text x="62" y="398" class="body">điểm PhoBERT và số tin</text>
+
+  <path d="M320 303 H350" stroke="#788895" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <text x="370" y="153" class="section">02  MA TRẬN 2 × 2</text>
+  <rect x="370" y="185" width="455" height="235" fill="#ffffff" stroke="#aebbc5"/>
+  <rect x="505" y="185" width="160" height="43" fill="#e9eef2"/>
+  <rect x="665" y="185" width="160" height="43" fill="#e9eef2"/>
+  <rect x="370" y="228" width="135" height="96" fill="#f6f8f9"/>
+  <rect x="370" y="324" width="135" height="96" fill="#f6f8f9"/>
+  <line x1="505" y1="185" x2="505" y2="420" stroke="#aebbc5"/>
+  <line x1="665" y1="185" x2="665" y2="420" stroke="#aebbc5"/>
+  <line x1="370" y1="228" x2="825" y2="228" stroke="#aebbc5"/>
+  <line x1="370" y1="324" x2="825" y2="324" stroke="#aebbc5"/>
+  <text x="585" y="213" class="body" text-anchor="middle" font-weight="700">LSTM</text>
+  <text x="745" y="213" class="body" text-anchor="middle" font-weight="700">Mamba-style</text>
+  <text x="386" y="267" class="body" font-weight="700">Market</text>
+  <text x="386" y="287" class="small">13 đặc trưng</text>
+  <text x="386" y="358" class="body" font-weight="700">Market + News</text>
+  <text x="386" y="379" class="small">13 + 2 đặc trưng</text>
+  <text x="585" y="278" class="count" text-anchor="middle">120</text>
+  <text x="585" y="301" class="small" text-anchor="middle">lượt chạy</text>
+  <text x="745" y="278" class="count" text-anchor="middle">120</text>
+  <text x="745" y="301" class="small" text-anchor="middle">lượt chạy</text>
+  <text x="585" y="374" class="count" text-anchor="middle">120</text>
+  <text x="585" y="397" class="small" text-anchor="middle">lượt chạy</text>
+  <text x="745" y="374" class="count" text-anchor="middle">120</text>
+  <text x="745" y="397" class="small" text-anchor="middle">lượt chạy</text>
+
+  <path d="M825 303 H855" stroke="#788895" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <text x="875" y="153" class="section">03  ĐÁNH GIÁ NGOÀI MẪU</text>
+  <rect x="875" y="185" width="280" height="235" rx="3" fill="#f6f8f9" stroke="#aebbc5"/>
+  <text x="892" y="216" class="label">Ba bài toán</text>
+  <text x="892" y="242" class="body">Return 1 và 5 phiên</text>
+  <text x="892" y="265" class="body">Volatility 5 phiên</text>
+  <line x1="892" y1="282" x2="1138" y2="282" stroke="#c7d0d7"/>
+  <text x="892" y="311" class="label">Chia theo thời gian</text>
+  <text x="892" y="337" class="body">Train ≤ 2023 · valid 2024</text>
+  <text x="892" y="360" class="body">Test ≥ 2025</text>
+  <line x1="892" y1="377" x2="1138" y2="377" stroke="#c7d0d7"/>
+  <text x="892" y="404" class="small">So sánh cùng mã, seed và ngày test</text>
+
+  <line x1="45" y1="466" x2="1155" y2="466" stroke="#c7d0d7"/>
+  <text x="45" y="497" class="body">Mỗi ô: 8 mã × 5 seed × 3 bài toán = 120 lượt chạy. Tổng cộng 480 lượt chạy mô hình chuỗi.</text>
+  <text x="45" y="523" class="body">Hai phép đối chứng: kiến trúc trong cùng hàng; giá trị tin tức trong cùng cột.</text>
+  <text x="45" y="559" class="small">Các mốc Train Mean, Zero Return và Ridge được đánh giá riêng; Zero Return chỉ áp dụng cho return.</text>
+  <text x="45" y="582" class="small">Tin được ghép theo giờ Việt Nam với cutoff 15:00. PhoBERT được fine-tune trên UTS2017_Bank.</text>
+</svg>
